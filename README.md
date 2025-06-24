@@ -20,7 +20,7 @@ For each implementation the framework:
 ## 1  Quick start
 
 ```cpp
-#include "compare_framework.hpp"
+#include "ComPPare.hpp"
 
 /*
 See example/saxpy
