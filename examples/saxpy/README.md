@@ -1,6 +1,6 @@
 # SAXPY Benchmark with ComPPare Framework
 
-## What is SAXPY?
+## SAXPY
 
 **SAXPY** stands for **Single-Precision A·X Plus Y**.  
 It computes the vector operation:
