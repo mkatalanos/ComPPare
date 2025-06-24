@@ -1,4 +1,4 @@
-# SAXPY Benchmark with CompareFramework
+# SAXPY Benchmark with ComPPare Framework
 
 ## What is SAXPY?
 
