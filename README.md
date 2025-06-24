@@ -1,8 +1,11 @@
 # ComPPare
 
 `ComPPare` is a tiny header-only utility that lets you **compare any number of host-side
-implementations**—CPU loops, CUDA launchers, OpenMP, TBB, etc.—that share the same *inputs* and
-produce the same *outputs*.  
+implementations**—CPU, CUDA kernels, OpenMP, TBB, etc.—that share the same *inputs* and
+produce the same *outputs*. 
+
+It streamlines the porting and validation process for scientific codebases transitioning to heterogeneous systems, especially when migrating CPU-based algorithms to GPU or into parallel frameworks.
+
 For each implementation the framework:
 
 | What it does                                   | Column in the report |
