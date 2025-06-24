@@ -12,7 +12,7 @@ endif()
 
 # Include the directory for ComPPare.hpp
 include_directories(
-    "${CMAKE_SOURCE_DIR}/../../"
+    "${CMAKE_SOURCE_DIR}/../../include"
 )
 
 find_package(Threads REQUIRED)
