@@ -1,6 +1,6 @@
-# compareFramework
+# ComPPare
 
-`compareFramework` is a tiny header-only utility that lets you **compare any number of host-side
+`ComPPare` is a tiny header-only utility that lets you **compare any number of host-side
 implementations**—CPU loops, CUDA launchers, OpenMP, TBB, etc.—that share the same *inputs* and
 produce the same *outputs*.  
 For each implementation the framework:
@@ -25,7 +25,7 @@ See example/saxpy
 using ScalarType = float;
 using VectorType = std::vector<float>;
 
-compareFramework::
+ComPPare::
     InputContext<ScalarType, VectorType, VectorType>::
         OutputContext<VectorType>
             compare(a, x, y);
@@ -65,7 +65,7 @@ gpu kernel                   6943.10           1936.11           5006.99        
 ## 2  Anatomy at a glance
 
 ```
-compareframework
+ComPPare
 │
 └───InputContext<Inputs...>          // pack input arguments
      │  inputs_  : std::tuple<Inputs...>
