@@ -28,7 +28,7 @@ void cpu_std(float a,
         }
     }
     auto t1 = std::chrono::steady_clock::now();
-    roi_us = std::chrono::duration<double, std::micro>(t1 - t0).count() / iters;
+    roi_us = std::chrono::duration<double, std::micro>(t1 - t0).count();
 }
 
 void cpu_par(float a,
@@ -68,7 +68,7 @@ void cpu_par(float a,
     }
     auto t1 = std::chrono::steady_clock::now();
 
-    roi_us = std::chrono::duration<double, std::micro>(t1 - t0).count() / iters;
+    roi_us = std::chrono::duration<double, std::micro>(t1 - t0).count();
 }
 
 #if (HAVE_NVHPC)
@@ -117,7 +117,7 @@ void gpu_std_par(float a,
     cudaEventSynchronize(stop);
     float ms = 0;
     cudaEventElapsedTime(&ms, start, stop);
-    roi_us = 1e3 * ms / iters;
+    roi_us = 1e3 * ms;
 
     cudaEventDestroy(start);
     cudaEventDestroy(stop);

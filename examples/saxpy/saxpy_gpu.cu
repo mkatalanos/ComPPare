@@ -61,7 +61,7 @@ void gpu_std(float a,
     cudaEventSynchronize(ev1);
     float ms = 0;
     cudaEventElapsedTime(&ms, ev0, ev1);
-    roi_us = 1e3 * ms / iters; // µs per iteration
+    roi_us = 1e3 * ms; 
 
     cudaEventDestroy(ev0);
     cudaEventDestroy(ev1);
