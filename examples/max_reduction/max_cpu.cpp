@@ -4,7 +4,9 @@
 #include <thread>
 #include <vector>
 #include <omp.h>
+#include <cmath>
 #include "max_cpu.hpp"
+#include <iostream>
 
 void cpu_max_serial(std::span<const float_t> in,
                     float_t &out,
@@ -50,28 +52,33 @@ void cpu_max_thread(std::span<const float_t> in,
 {
     const unsigned num_threads = std::thread::hardware_concurrency();
 
-    const size_t N = in.size();
-    const size_t base = N / num_threads;
-    const size_t remainder = N % num_threads;
-
     std::vector<float_t> local_max(num_threads);
     std::vector<std::thread> threads(num_threads);
+    std::vector<std::pair<size_t, size_t> > ranges(num_threads);
+
+    const size_t N = in.size();
+    const size_t base = std::floor(static_cast<float>(N) / static_cast<float>(num_threads));
+    const size_t remainder = N % num_threads;
+
+    size_t start = 0;
+    for (unsigned t = 0; t < num_threads; ++t)
+    {
+        size_t end = start + base + (t < remainder ? 1 : 0);
+        ranges[t].first = start;
+        ranges[t].second = end;
+        start = end;
+    }
 
     float_t result;
 
     auto cpu_start = std::chrono::high_resolution_clock::now();
     for (size_t rep = 0; rep < iters; ++rep)
     {
-        size_t start = 0;
         // launch workers
         for (unsigned t = 0; t < num_threads; ++t)
         {
             threads[t] = std::thread([&, t]()
-                                     {
-                size_t end = start + base + (t < remainder ? 1 : 0);
-                local_max[t] = *std::max_element(in.data()+ start, in.data()+ end); 
-                start = end;
-            });
+                                     { local_max[t] = *std::max_element(in.data() + ranges[t].first, in.data() + ranges[t].second); });
         }
         // join and reduce
         for (auto &th : threads)
