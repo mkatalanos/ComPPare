@@ -30,22 +30,22 @@ ComPPare lets you time and cross‑check any number of host‑side implementatio
 
 ### 1. Adopt the required function signature
 
-    ```cpp
-    void impl(const Inputs&... in,      // read‑only inputs
-            Outputs&...      out,     // outputs compared to reference
-            size_t           iters,   // loop iterations (benchmark repeats)
-            double&          roi_us); // your measured region‑of‑interest in micro‑seconds
-    {
-        // setup (memory allocation, data transfer, etc.)
+```cpp
+void impl(const Inputs&... in,      // read‑only inputs
+        Outputs&...      out,     // outputs compared to reference
+        size_t           iters,   // loop iterations (benchmark repeats)
+        double&          roi_us); // your measured region‑of‑interest in micro‑seconds
+{
+    // setup (memory allocation, data transfer, etc.)
 
-        auto t_start = now();    // start ROI timer
-        for (size_t i = 0; i < iters; ++i) {
-            // ... perform core computation here ...
-        }
-        auto t_end = now();      // end ROI timer
-        roi_us = duration_us(t_start, t_end); // write back roi time
+    auto t_start = now();    // start ROI timer
+    for (size_t i = 0; i < iters; ++i) {
+        // ... perform core computation here ...
     }
-    ```
+    auto t_end = now();      // end ROI timer
+    roi_us = duration_us(t_start, t_end); // write back roi time
+}
+```
 
 * The final two parameters are supplied by ComPPare.
 * `iters` lets you execute your region of interest many times for stable timing.
@@ -53,63 +53,63 @@ ComPPare lets you time and cross‑check any number of host‑side implementatio
 
 
 #### SAXPY function example signature:
-    ```cpp
-    void saxpy_cpu(/*Input pack*/
-                float a,
-                const std::vector<float> &x,
-                const std::vector<float> &y_in,
-                /*Output pack*/
-                std::vector<float> &y_out,
-                /*Iterations*/
-                size_t iters,
-                /*Region of Interest timing (us)*/
-                double &roi_us)
-    ```
+```cpp
+void saxpy_cpu(/*Input pack*/
+            float a,
+            const std::vector<float> &x,
+            const std::vector<float> &y_in,
+            /*Output pack*/
+            std::vector<float> &y_out,
+            /*Iterations*/
+            size_t iters,
+            /*Region of Interest timing (us)*/
+            double &roi_us)
+```
 
 
 ### 2. Create a comparison object
 
 1. **Describe the types** — list the *input* types first, then the *output* types:
 
-   ```cpp
-    using Cmp = 
-        ComPPare::
-            /*Define Input Pack Types same as the function*/
-            InputContext<float, 
-                std::vector<float>, 
-                std::vector<float>>::
-                    /*Define Output Pack types same as the function*/
-                    OutputContext<std::vector<float>>;
-   ```
+```cpp
+using Cmp = 
+    ComPPare::
+        /*Define Input Pack Types same as the function*/
+        InputContext<float, 
+            std::vector<float>, 
+            std::vector<float>>::
+                /*Define Output Pack types same as the function*/
+                OutputContext<std::vector<float>>;
+```
 
 2. **Pass the input data** — constructs framework object with input data that will be reused for every implementation:
 
-   ```cpp
-   Cmp cmp(a, x, y);   // a: float, x: input vector, y: initial output
-   ```
+```cpp
+Cmp cmp(a, x, y);   // a: float, x: input vector, y: initial output
+```
 
 ### 3. Register implementations
 
-    ```cpp
-    cmp.set_reference("CPU serial", cpu_std);  // reference must be set first
-    cmp.add("CPU OpenMP",  cpu_omp);           // any number of additional back‑ends
-    ```
+```cpp
+cmp.set_reference("CPU serial", cpu_std);  // reference must be set first
+cmp.add("CPU OpenMP",  cpu_omp);           // any number of additional back‑ends
+```
 
 ### 4. Run and inspect
 
-    ```cpp
-    cmp.run(/*iterations*/50, 
-            /*tolerance*/1e-6, 
-            /*warmup run before benchmark*/true);
-    ```
+```cpp
+cmp.run(/*iterations*/50, 
+        /*tolerance*/1e-6, 
+        /*warmup run before benchmark*/true);
+```
 
 #### Sample report:
 
-    ```
-    Name           Func µs   ROI µs   Ovhd µs  Max|err|[0]  …
-    CPU serial     1.34e+5   …        …        0.00e+00     OK
-    CPU OpenMP     2.96e+4   …        …        0.00e+00     OK
-    ```
+```
+Name           Func µs   ROI µs   Ovhd µs  Max|err|[0]  …
+CPU serial     1.34e+5   …        …        0.00e+00     OK
+CPU OpenMP     2.96e+4   …        …        0.00e+00     OK
+```
 
 ### Complete example with SAXPY
 
