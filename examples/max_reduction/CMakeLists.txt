@@ -108,16 +108,6 @@ endif()
 # set the CUDA architectures for the project
 set(CMAKE_CUDA_ARCHITECTURES ${arch_list} CACHE STRING "" FORCE)
 
-# # link CUDA sources into shared library (not sure why but double free error when static linking)
-# # could be due to the use of std::par on GPU with NVHPC
-# add_library(saxpy_cuda SHARED ${CUDA_SOURCES})
-# target_link_libraries(saxpy_cuda 
-#                       PRIVATE 
-#                       CUDA::cudart 
-#                       ${CMAKE_THREAD_LIBS_INIT}
-# )
-# set_target_properties(saxpy_cuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
 # final executable
 add_executable(${PROJECT_NAME} ${CPP_SOURCES} ${CUDA_SOURCES})
 target_link_libraries(${PROJECT_NAME}
