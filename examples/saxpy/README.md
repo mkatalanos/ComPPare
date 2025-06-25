@@ -21,9 +21,11 @@ where:
 ### Dependencies
 
 * CMake
-* C++17 compatible compiler
-* For GPU builds:
-  * NVIDIA HPC SDK with `nvc++` (stdpar-on-GPU)
+* C++20 compatible compiler
+* For GPU kernel build:
+  * NVIDIA nvcc compiler wrapper
+* For C++ stdpar on GPU builds:
+  * NVIDIA HPC SDK with `nvc++`
 
 ---
 
