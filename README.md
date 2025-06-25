@@ -85,7 +85,7 @@ using Cmp =
 2. **Pass the input data** — constructs framework object with input data that will be reused for every implementation:
 
 ```cpp
-Cmp cmp(a, x, y);   // a: float, x: input vector, y: initial output
+Cmp cmp(a, x, y);   // a: float, x: input vector x, y: input vector y
 ```
 
 ### 3. Register implementations
