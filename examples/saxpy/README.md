@@ -61,23 +61,6 @@ cmake \
 make
 ````
 
-### CPU Build (with nvc++, stdpar on GPU)
-```bash
-mkdir build && cd build
-
-cmake \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_COMPILER=nvc++ \
-    -DCUDA=OFF \
-    ..
-
-make
-````
-
-Notes:
-
-* Requires `nvc++` compiler from NVIDIA HPC SDK for stdpar to run on GPU
-
 ### CPU only Build (default)
 
 ```bash
