@@ -67,7 +67,7 @@ MaxConfig init_max(int argc, char **argv)
     cfg.data = std::span<float_t>(data, cfg.N);
 
     // Print config
-    std::cout << "\n=== SAXPY Benchmark Parameters ===\n";
+    std::cout << "\n=== Max Reduction Benchmark Parameters ===\n";
     std::cout << "Vector size (N)     : " << cfg.data.size() << '\n';
     std::cout << "Iterations          : " << cfg.iters << '\n';
     std::cout << "Error tolerance     : " << cfg.tol << '\n';
