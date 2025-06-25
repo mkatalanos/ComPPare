@@ -48,38 +48,35 @@ void cpu_max_thread(std::span<const float_t> in,
                     const size_t iters,
                     double &roi_us)
 {
-    auto cpu_start = std::chrono::high_resolution_clock::now();
+    const unsigned num_threads = std::thread::hardware_concurrency();
 
     const size_t N = in.size();
-    const unsigned num_threads = std::thread::hardware_concurrency();
+    const size_t base = N / num_threads;
+    const size_t remainder = N % num_threads;
+
     std::vector<float_t> local_max(num_threads);
     std::vector<std::thread> threads(num_threads);
 
     float_t result;
+
+    auto cpu_start = std::chrono::high_resolution_clock::now();
     for (size_t rep = 0; rep < iters; ++rep)
     {
-        // initialize each thread's local max
-        for (auto &lm : local_max)
-            lm = std::numeric_limits<float_t>::lowest();
-
+        size_t start = 0;
         // launch workers
         for (unsigned t = 0; t < num_threads; ++t)
         {
             threads[t] = std::thread([&, t]()
                                      {
-                size_t chunk = (N + num_threads - 1) / num_threads;
-                size_t start = t * chunk;
-                size_t end   = std::min(start + chunk, N);
-
+                size_t end = start + base + (t < remainder ? 1 : 0);
                 local_max[t] = *std::max_element(in.data()+ start, in.data()+ end); 
+                start = end;
             });
         }
-
         // join and reduce
         for (auto &th : threads)
             th.join();
-
-            result = *std::max_element(local_max.begin(), local_max.end());
+        result = *std::max_element(local_max.begin(), local_max.end());
     }
 
     auto cpu_end = std::chrono::high_resolution_clock::now();
