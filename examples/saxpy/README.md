@@ -99,6 +99,7 @@ The executable takes the following command-line arguments:
 | `--scalar` | scalar multiplier `a`              | random \[-5, 5] |
 | `--iter`   | number of benchmark iterations     | 10              |
 | `--tol`    | numerical tolerance for validation | 1e-6            |
+| `--warmup/--no-warmup` | to do warmup run or not | warmup |
 
 ### Example
 
