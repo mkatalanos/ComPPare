@@ -237,7 +237,7 @@ namespace ComPPare
                     // end of timing
 
                     // Calculate the time taken by the function in microseconds
-                    double func_us = std::chrono::duration<double, std::micro>(t1 - t0).count() / iters;
+                    double func_us = std::chrono::duration<double, std::micro>(t1 - t0).count();
                     double ovhd_us = func_us - roi_us;
 
                     // Create an array to hold error statistics for each output
