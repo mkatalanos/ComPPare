@@ -244,7 +244,7 @@ namespace ComPPare
                     }
 
                     // Measure the time taken by the function
-                    auto t0 = std::chrono::steady_clock::now();
+                    auto t0 = std::chrono::high_resolution_clock::now();
                     /*
                     use std::apply to unpack the inputs and outputs completely to do 1 function call of the implementation
                     this is equivalent to calling:
@@ -255,7 +255,7 @@ namespace ComPPare
                                      [&](auto &...out)
                                      { impl.fn(in..., out..., iters, roi_us); },
                                      outs); }, inputs_);
-                    auto t1 = std::chrono::steady_clock::now();
+                    auto t1 = std::chrono::high_resolution_clock::now();
                     // end of timing
 
                     // Calculate the time taken by the function in microseconds
