@@ -131,6 +131,7 @@ namespace ComPPare
 
             // Function to set a reference implementation
             template <typename F>
+            requires std::invocable<F, const Inputs&..., Outputs&..., size_t, double&>
             void set_reference(std::string name, F &&f)
             {
                 impls_.insert(impls_.begin(), {std::move(name), Func(std::forward<F>(f))});
@@ -138,6 +139,7 @@ namespace ComPPare
 
             // Function to add an implementation to the comparison
             template <typename F>
+            requires std::invocable<F, const Inputs&..., Outputs&..., size_t, double&>
             void add(std::string name, F &&f)
             {
                 impls_.push_back({std::move(name), Func(std::forward<F>(f))});
