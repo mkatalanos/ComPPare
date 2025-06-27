@@ -31,11 +31,17 @@ namespace ComPPare
             using Func = std::function<void(const Inputs &..., Outputs &...,
                                             size_t, double &)>;
 
-            // Holds each output type in a tuple
-            using OutTup = std::tuple<Outputs...>;
-
             // Alias for the error statistics class
             using ErrorStats = ComPPare::internal::ErrorStats;
+
+            // Holds each input and output type in a tuple
+            using InTup = std::tuple<Inputs...>;
+            using OutTup = std::tuple<Outputs...>;
+
+            // Tuple to hold all input parameters/data
+            InTup inputs_;
+            // Reference output tuple to hold the outputs of the first implementation
+            OutTup ref_out;
 
             // Struct to hold the function name and function pointer
             struct Impl
@@ -43,13 +49,8 @@ namespace ComPPare
                 std::string name;
                 Func fn;
             };
-
-            // Tuple to hold all input parameters/data
-            std::tuple<Inputs...> inputs_;
             // Vector to hold all implementations
             std::vector<Impl> impls_;
-            // Reference output tuple to hold the outputs of the first implementation
-            OutTup ref_out;
 
         public:
             // Constructor to initialize the OutputContext with inputs
