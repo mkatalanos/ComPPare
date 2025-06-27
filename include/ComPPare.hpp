@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <memory>
 
 #include "ErrorStats.hpp"
 
@@ -38,10 +39,14 @@ namespace ComPPare
             using InTup = std::tuple<Inputs...>;
             using OutTup = std::tuple<Outputs...>;
 
+            // reference to output parameter/data
+            using OutPtr = std::shared_ptr<OutTup>;
+            using OutVec = std::vector<OutPtr>;
+
             // Tuple to hold all input parameters/data
             InTup inputs_;
             // Reference output tuple to hold the outputs of the first implementation
-            OutTup ref_out;
+            OutVec outputs_;
 
             // Struct to hold the function name and function pointer
             struct Impl
@@ -51,6 +56,38 @@ namespace ComPPare
             };
             // Vector to hold all implementations
             std::vector<Impl> impls_;
+
+            inline OutPtr get_output_by_index_(const size_t idx) const
+            {
+                if (outputs_.empty())
+                    throw std::logic_error("run() has not been executed");
+                if (idx >= outputs_.size())
+                    throw std::out_of_range("Index out of range for outputs");
+
+                return outputs_[idx];
+            }
+
+            inline OutPtr get_output_by_name_(const std::string &name) const
+            {
+                if (outputs_.empty())
+                    throw std::logic_error("run() has not been executed");
+                for (size_t i = 0; i < impls_.size(); ++i)
+                {
+                    if (impls_[i].name == name)
+                        return outputs_[i];
+                }
+                throw std::invalid_argument("No output found with the name: " + name);
+            }
+
+            void unpack_outputs_(const OutTup &outtup, Outputs*... outs) const
+            {
+                std::apply(
+                    [&](auto &...outtup_elem){
+                        (( *outs = outtup_elem), ...);
+                    },
+                    outtup
+                );
+            }
 
         public:
             // Constructor to initialize the OutputContext with inputs
@@ -76,28 +113,18 @@ namespace ComPPare
                 if (this != &other)
                 {
                     inputs_ = std::move(other.inputs_);
-                    ref_out = std::move(other.ref_out);
+                    outputs_ = std::move(other.outputs_);
                     impls_ = std::move(other.impls_);
-
-                    // Reset the moved-from object
-                    other.inputs_ = InTup();
-                    other.ref_out = OutTup();
-                    other.impls_.clear();
                 }
             }
             // move assignment operator
-            OutputContext &operator=(OutputContext &&other) noexcept 
+            OutputContext &operator=(OutputContext &&other) noexcept
             {
                 if (this != &other)
                 {
                     inputs_ = std::move(other.inputs_);
-                    ref_out = std::move(other.ref_out);
+                    outputs_ = std::move(other.outputs_);
                     impls_ = std::move(other.impls_);
-
-                    // Reset the moved-from object
-                    other.inputs_ = InTup();
-                    other.ref_out = OutTup();
-                    other.impls_.clear();
                 }
                 return *this;
             }
@@ -117,6 +144,46 @@ namespace ComPPare
             }
 
             /*
+            Getter for the output results
+            */
+
+            // returns a shared pointer to the reference output
+            // std::shared_ptr<std::tuple<Outputs...>>
+            const OutPtr get_reference_output() const
+            {
+                return get_output_by_index_(0);
+            }
+
+            const OutPtr get_output(const size_t idx) const
+            {
+                return get_output_by_index_(idx);
+            }
+
+            const OutPtr get_output(const std::string &name) const
+            {
+                return get_output_by_name_(name);
+            }
+
+            // Unpack the outputs into the provided pointers
+            void get_reference_output(Outputs*... outs) const
+            {
+                const auto &outtup = *get_output_by_index_(0);
+                unpack_outputs_(outtup, outs...);
+            }
+
+            void get_output(const size_t idx, Outputs*... outs) const
+            {
+                const auto &outtup = *get_output_by_index_(idx);
+                unpack_outputs_(outtup, outs...);
+            }
+
+            void get_output(const std::string &name, Outputs*... outs) const
+            {
+                const auto &outtup = *get_output_by_name_(name);
+                unpack_outputs_(outtup, outs...);
+            }
+
+            /*
             Runs the comparison for all added implementations.
             Arguments:
             iterations -- the number of iteratins inside each custom function
@@ -130,6 +197,9 @@ namespace ComPPare
                     std::cerr << "\n*----------*\nNo implementations added to the ComPPare Framework.\n*----------*\n";
                     return;
                 }
+
+                outputs_.reserve(impls_.size()); // reserve space for outputs -- resize and use index works too.
+
                 // Number of output arguments -- sizeof... is used to get the number of elements in a pack
                 // https://en.cppreference.com/w/cpp/language/sizeof....html
                 constexpr size_t NUM_OUT = sizeof...(Outputs);
@@ -157,7 +227,8 @@ namespace ComPPare
                     // Get the current implementation
                     auto &impl = impls_[k];
 
-                    OutTup outs;         // output tuple to hold the outputs of the current implementation
+                    OutTup outs;
+
                     double roi_us = 0.0; // roi time in microseconds
 
                     // warmup run of 1 iteration
@@ -197,6 +268,8 @@ namespace ComPPare
                     // calculate error if not reference implementation
                     if (k != 0)
                     {
+                        OutPtr ref_out_ptr = outputs_[0];
+                        OutTup &ref_out = *ref_out_ptr;
                         /*
                         unpack the reference outputs and current outputs one by one
                         it is like calling:
@@ -213,8 +286,7 @@ namespace ComPPare
                     }
 
                     // first impl is the reference
-                    if (k == 0)
-                        ref_out = outs;
+                    outputs_.push_back(std::make_shared<OutTup>(std::move(outs)));
 
                     // Print the results for the current implementation
                     std::cout << std::left << std::setw(COL_W) << impl.name
