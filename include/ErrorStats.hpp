@@ -17,7 +17,7 @@ namespace ComPPare::internal
         double max_error_ = 0.0;                              // Maximum error observed
         double total_error_ = 0.0;                            // Sum of all errors
         size_t error_count_ = 0;                              // Count of errors
-        size_t element_count = 0;                             // Count of elements compared
+        size_t element_count_ = 0;                             // Count of elements compared
         size_t max_pos_ = std::numeric_limits<size_t>::max(); // Position of the maximum error
 
     public:
@@ -33,11 +33,11 @@ namespace ComPPare::internal
         ErrorStats &operator=(ErrorStats &&) = default;
 
         /* Getter */
-        [[nodiscard]] double mean() const { return element_count ? total_error_ / element_count : 0.0; }
+        [[nodiscard]] double mean() const { return element_count_ ? total_error_ / element_count_ : 0.0; }
         [[nodiscard]] double max() const { return max_error_; }
         [[nodiscard]] double sum() const { return total_error_; }
         [[nodiscard]] size_t error_count() const { return error_count_; }
-        [[nodiscard]] size_t element_count() const { return element_count; }
+        [[nodiscard]] size_t element_count() const { return element_count_; }
         [[nodiscard]] size_t max_pos() const { return max_pos_; }
 
         /*
@@ -55,7 +55,7 @@ namespace ComPPare::internal
             // Update the error statistics
             total_error_ = e;
             error_count_ = 1;
-            element_count = 1;
+            element_count_ = 1;
             max_error_ = e;
             max_pos_ = 0;
         }
@@ -75,7 +75,7 @@ namespace ComPPare::internal
             // Update the error statistics
             total_error_ = e;
             error_count_ = 1;
-            element_count = 1;
+            element_count_ = 1;
             max_error_ = e;
             max_pos_ = 0;
         }
@@ -98,7 +98,7 @@ namespace ComPPare::internal
             for (; it_a != std::ranges::end(a) && it_b != std::ranges::end(b);
                  ++it_a, ++it_b, ++idx)
             {
-                element_count++; // increment the count of elements compared
+                element_count_++; // increment the count of elements compared
 
                 // compute the absolute error between the two elements
                 double e = std::abs(double(*it_a - *it_b));
