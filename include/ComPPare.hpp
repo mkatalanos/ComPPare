@@ -5,116 +5,13 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
-#include <tuple>
 #include <vector>
-#include <concepts>
-#include <ranges>
-#include <type_traits>
-#include <limits>
+#include <array>
+
+#include "ErrorStats.hpp"
 
 namespace ComPPare
 {
-    /*
-    Struct to hold error statistics for comparing outputs of different implementations.
-    */
-    struct ErrorStats
-    {
-        double max = 0.0; // Maximum error observed
-        double sum = 0.0; // Sum of all errors
-        size_t n = 0;     // Count of errors
-
-        size_t argmax_vec = std::numeric_limits<size_t>::max();
-        size_t argmax_pos = std::numeric_limits<size_t>::max();
-
-        double mean() const { return n ? sum / n : 0.0; }
-    };
-
-    /*
-    Only for floating point type (float, double etc)
-    Computes the error statistics between two values.
-    */
-    template <std::floating_point T>
-    inline ErrorStats error_stats(const T &a, const T &b, const double tol)
-    {
-        ErrorStats s;
-
-        double e = std::abs(static_cast<double>(a) - static_cast<double>(b));
-        // If the error is below the tolerance, we return an empty ErrorStats
-        if (e < tol)
-            return s;
-
-        // Update the error statistics
-        s.sum = e;
-        s.n = 1;
-        s.max = e;
-        s.argmax_pos = 0;
-        return s;
-    }
-
-    /*
-    For integral types (int, long, etc)
-    Computes the error statistics between two values.
-    */
-    template <std::integral T>
-    inline ErrorStats error_stats(const T &a, const T &b, const double tol)
-    {
-        ErrorStats s;
-
-        double e = static_cast<double>(std::abs(a - b));
-        // If the error is below the tolerance, we return an empty ErrorStats
-        if (e < tol)
-            return s;
-
-        // Update the error statistics
-        s.sum = e;
-        s.n = 1;
-        s.max = e;
-        s.argmax_pos = 0;
-        return s;
-    }
-
-    /*
-    For ranges of arithmetic types (integral or floating point)
-    Computes the error statistics between two ranges -- std::vector, std::array, etc.
-    The ranges must be forward ranges and the elements must be arithmetic types.
-    */
-    template <std::ranges::forward_range R>
-    requires std::is_arithmetic_v<std::ranges::range_value_t<R> > // std::ranges::range_value_t<R> returns the type of element within the range --> must be arithmetic
-        inline ErrorStats error_stats(const R &a, const R &b, const double tol)
-    {
-        ErrorStats s;
-
-        // iterator of both ranges
-        auto it_a = std::ranges::begin(a);
-        auto it_b = std::ranges::begin(b);
-        size_t idx = 0;
-
-        // loop through both ranges until one of them ends
-        for (; it_a != std::ranges::end(a) && it_b != std::ranges::end(b);
-             ++it_a, ++it_b, ++idx)
-        {
-            // compute the absolute error between the two elements
-            double e = std::abs(double(*it_a - *it_b));
-
-            if (e < tol)
-                continue; // skip if error is below tolerance
-
-            // accumulate the error statistics
-            s.sum += e;
-            // increment the count of errors
-            s.n++;
-
-            if (e > s.max) // if the current error is greater than the maximum observed error
-            {
-                // update the maximum error
-                s.max = e;
-                // store the index of the vector where the maximum error occurred
-                s.argmax_pos = idx;
-            }
-        }
-        return s;
-    }
-
     /*
     InputContext class template to hold input parameters for the comparison framework.
     */
@@ -136,6 +33,9 @@ namespace ComPPare
 
             // Holds each output type in a tuple
             using OutTup = std::tuple<Outputs...>;
+
+            // Alias for the error statistics class
+            using ErrorStats = ComPPare::internal::ErrorStats;
 
             // Struct to hold the function name and function pointer
             struct Impl
@@ -258,7 +158,7 @@ namespace ComPPare
                                    { std::apply([&](auto &...outT)
                                                 {
                     size_t v = 0;
-                    ((perVec[v] = error_stats(outT, outR, tol), ++v), ...); }, outs); }, ref_out);
+                    ((perVec[v].error_stats(outT, outR, tol), ++v), ...); }, outs); }, ref_out);
                     }
 
                     // first impl is the reference
@@ -275,14 +175,14 @@ namespace ComPPare
                     for (size_t v = 0; v < NUM_OUT; ++v)
                     {
                         const auto &es = perVec[v];
-                        double maxerr = (k == 0) ? 0.0 : es.max;
+                        double maxerr = (k == 0) ? 0.0 : es.max();
                         double meanerr = (k == 0) ? 0.0 : es.mean();
-                        double sumerr = (k == 0) ? 0.0 : es.sum;
+                        double sumerr = (k == 0) ? 0.0 : es.sum();
 
                         if (k && maxerr > tol) // fail threshold
                             std::cout
                                 << std::setw(COL_W) << std::scientific << maxerr
-                                << std::setw(COL_W) << es.argmax_pos; // print max error and location (index)
+                                << std::setw(COL_W) << es.max_pos(); // print max error and location (index)
                         else
                             std::cout
                                 << std::setw(COL_W) << std::scientific << 0.0
@@ -295,7 +195,7 @@ namespace ComPPare
                     }
                     bool fail = false;
                     for (const auto &e : perVec)
-                        if (e.max > tol)
+                        if (e.max() > tol)
                         {
                             fail = true;
                             break;
