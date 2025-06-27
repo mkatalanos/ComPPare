@@ -57,6 +57,51 @@ namespace ComPPare
             // This is used to hold and pass the same input arguments/data for all implementations
             explicit OutputContext(const Inputs &...ins) : inputs_(ins...) {}
 
+            // copy constructor does NOT copy the reference output
+            OutputContext(const OutputContext &other) : inputs_(other.inputs_), impls_(other.impls_) {}
+            // copy assignment operator
+            OutputContext &operator=(const OutputContext &other)
+            {
+                if (this != &other)
+                {
+                    inputs_ = other.inputs_;
+                    impls_ = other.impls_;
+                }
+                return *this;
+            }
+
+            // move constructor -- might consider not allowing move semantics for OutputContext
+            OutputContext(OutputContext &&other) noexcept
+            {
+                if (this != &other)
+                {
+                    inputs_ = std::move(other.inputs_);
+                    ref_out = std::move(other.ref_out);
+                    impls_ = std::move(other.impls_);
+
+                    // Reset the moved-from object
+                    other.inputs_ = InTup();
+                    other.ref_out = OutTup();
+                    other.impls_.clear();
+                }
+            }
+            // move assignment operator
+            OutputContext &operator=(OutputContext &&other) noexcept 
+            {
+                if (this != &other)
+                {
+                    inputs_ = std::move(other.inputs_);
+                    ref_out = std::move(other.ref_out);
+                    impls_ = std::move(other.impls_);
+
+                    // Reset the moved-from object
+                    other.inputs_ = InTup();
+                    other.ref_out = OutTup();
+                    other.impls_.clear();
+                }
+                return *this;
+            }
+
             // Function to set a reference implementation
             template <typename F>
             void set_reference(std::string name, F &&f)
@@ -80,6 +125,11 @@ namespace ComPPare
             */
             void run(size_t iters = 10, double tol = 1e-6, bool warmup = true)
             {
+                if (impls_.empty())
+                {
+                    std::cerr << "\n*----------*\nNo implementations added to the ComPPare Framework.\n*----------*\n";
+                    return;
+                }
                 // Number of output arguments -- sizeof... is used to get the number of elements in a pack
                 // https://en.cppreference.com/w/cpp/language/sizeof....html
                 constexpr size_t NUM_OUT = sizeof...(Outputs);
