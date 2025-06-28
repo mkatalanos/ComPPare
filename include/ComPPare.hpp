@@ -268,7 +268,7 @@ namespace ComPPare
                     double ovhd_us = func_us - roi_us;
 
                     // Create an array to hold error statistics for each output
-                    std::array<ErrorStats, NUM_OUT> perVec{};
+                    std::array<ErrorStats, NUM_OUT> error_per_output{};
 
                     // calculate error if not reference implementation
                     if (k != 0)
@@ -280,14 +280,14 @@ namespace ComPPare
                         it is like calling:
                         for (size_t v = 0; v < NUM_OUT; ++v)
                         {
-                            perVec[v] = error_stats(ref_out[v], outs[v], tol);
+                            error_per_output[v] = error_stats(ref_out[v], outs[v], tol);
                         }
                         */
                         std::apply([&](auto &...outR)
                                    { std::apply([&](auto &...outT)
                                                 {
                     size_t v = 0;
-                    ((perVec[v].error_stats(outT, outR, tol), ++v), ...); }, outs); }, ref_out);
+                    ((error_per_output[v].error_stats(outT, outR, tol), ++v), ...); }, outs); }, ref_out);
                     }
 
                     // first impl is the reference
@@ -302,7 +302,7 @@ namespace ComPPare
                     // per-output print error
                     for (size_t v = 0; v < NUM_OUT; ++v)
                     {
-                        const auto &es = perVec[v];
+                        const auto &es = error_per_output[v];
                         double maxerr = (k == 0) ? 0.0 : es.max();
                         double meanerr = (k == 0) ? 0.0 : es.mean();
                         double sumerr = (k == 0) ? 0.0 : es.sum();
@@ -322,8 +322,8 @@ namespace ComPPare
                             << std::setw(COL_W) << std::scientific << sumerr;
                     }
                     bool fail = false;
-                    for (const auto &e : perVec)
-                        if (e.max() > tol)
+                    for (const auto &es : error_per_output)
+                        if (es.max() > tol)
                         {
                             fail = true;
                             break;
