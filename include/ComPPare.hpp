@@ -8,6 +8,7 @@
 #include <vector>
 #include <array>
 #include <memory>
+#include <string_view>
 
 #include "ErrorStats.hpp"
 
@@ -66,8 +67,8 @@ namespace ComPPare
 
                 return outputs_[idx];
             }
-
-            inline OutPtr get_output_by_name_(const std::string &name) const
+            
+            inline OutPtr get_output_by_name_(const std::string_view name) const
             {
                 if (outputs_.empty())
                     throw std::logic_error("run() has not been executed");
@@ -76,7 +77,9 @@ namespace ComPPare
                     if (impls_[i].name == name)
                         return outputs_[i];
                 }
-                throw std::invalid_argument("No output found with the name: " + name);
+                std::stringstream os;
+                os << "Output with name '" << name << "' not found";
+                throw std::invalid_argument(os.str());
             }
 
             void unpack_outputs_(const OutTup &outtup, Outputs*... outs) const
@@ -161,7 +164,7 @@ namespace ComPPare
                 return get_output_by_index_(idx);
             }
 
-            const OutPtr get_output(const std::string &name) const
+            const OutPtr get_output(const std::string_view name) const
             {
                 return get_output_by_name_(name);
             }
@@ -179,7 +182,7 @@ namespace ComPPare
                 unpack_outputs_(outtup, outs...);
             }
 
-            void get_output(const std::string &name, Outputs*... outs) const
+            void get_output(const std::string_view name, Outputs*... outs) const
             {
                 const auto &outtup = *get_output_by_name_(name);
                 unpack_outputs_(outtup, outs...);
