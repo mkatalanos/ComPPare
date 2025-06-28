@@ -17,7 +17,7 @@ namespace ComPPare::internal
         double max_error_ = 0.0;                              // Maximum error observed
         double total_error_ = 0.0;                            // Sum of all errors
         size_t error_count_ = 0;                              // Count of errors
-        size_t element_count_ = 0;                             // Count of elements compared
+        size_t element_count_ = 0;                            // Count of elements compared
         size_t max_pos_ = std::numeric_limits<size_t>::max(); // Position of the maximum error
 
     public:
@@ -47,6 +47,12 @@ namespace ComPPare::internal
         template <std::floating_point T>
         inline void error_stats(const T &a, const T &b, const double tol)
         {
+            // Check if the values are finite (not NaN or Inf)
+            if (!std::isfinite(a) || !std::isfinite(b))
+            {
+                // If either value is not finite, we skip the error calculation
+                return;
+            }
             double e = std::abs(static_cast<double>(a) - static_cast<double>(b));
             // If the error is below the tolerance, we return an empty ErrorStats
             if (e < tol)
@@ -99,6 +105,17 @@ namespace ComPPare::internal
                  ++it_a, ++it_b, ++idx)
             {
                 element_count_++; // increment the count of elements compared
+
+                // check if is floating point type
+                if constexpr (std::is_floating_point_v<std::ranges::range_value_t<R>>)
+                {
+                    // check if is valid number (not NaN or Inf)
+                    if (!std::isfinite(*it_a) || !std::isfinite(*it_b))
+                    {
+                        // if either element is not finite, we skip the error calculation
+                        continue;
+                    }
+                }
 
                 // compute the absolute error between the two elements
                 double e = std::abs(double(*it_a - *it_b));
