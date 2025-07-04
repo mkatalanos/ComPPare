@@ -1,1 +1,3 @@
 examples/saxpy/build/
+example/max_reduction/build
+examples/dummy/
