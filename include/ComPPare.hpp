@@ -67,7 +67,7 @@ namespace ComPPare
 
                 return outputs_[idx];
             }
-            
+
             inline OutPtr get_output_by_name_(const std::string_view name) const
             {
                 if (outputs_.empty())
@@ -82,20 +82,25 @@ namespace ComPPare
                 throw std::invalid_argument(os.str());
             }
 
-            void unpack_outputs_(const OutTup &outtup, Outputs*... outs) const
+            void unpack_output_(const OutTup &outtup, Outputs *...outs) const
             {
                 std::apply(
-                    [&](auto &...outtup_elem){
-                        (( *outs = outtup_elem), ...);
+                    [&](auto &...outtup_elem)
+                    {
+                        ((*outs = outtup_elem), ...);
                     },
-                    outtup
-                );
+                    outtup);
             }
 
         public:
             // Constructor to initialize the OutputContext with inputs
             // This is used to hold and pass the same input arguments/data for all implementations
-            explicit OutputContext(const Inputs &...ins) : inputs_(ins...) {}
+            // The inputs are perfectly forwarded -- for instance taking ownership when moving
+            template <typename... Ins>
+            explicit OutputContext(Ins &&...ins)
+                : inputs_(std::forward<Ins>(ins)...)
+            {
+            }
 
             // copy constructor does NOT copy the reference output
             OutputContext(const OutputContext &other) : inputs_(other.inputs_), impls_(other.impls_) {}
@@ -134,7 +139,7 @@ namespace ComPPare
 
             // Function to set a reference implementation
             template <typename F>
-            requires std::invocable<F, const Inputs&..., Outputs&..., size_t, double&>
+                requires std::invocable<F, const Inputs &..., Outputs &..., size_t, double &>
             void set_reference(std::string name, F &&f)
             {
                 impls_.insert(impls_.begin(), {std::move(name), Func(std::forward<F>(f))});
@@ -142,7 +147,7 @@ namespace ComPPare
 
             // Function to add an implementation to the comparison
             template <typename F>
-            requires std::invocable<F, const Inputs&..., Outputs&..., size_t, double&>
+                requires std::invocable<F, const Inputs &..., Outputs &..., size_t, double &>
             void add(std::string name, F &&f)
             {
                 impls_.push_back({std::move(name), Func(std::forward<F>(f))});
@@ -170,22 +175,22 @@ namespace ComPPare
             }
 
             // Unpack the outputs into the provided pointers
-            void get_reference_output(Outputs*... outs) const
+            void get_reference_output(Outputs *...outs) const
             {
                 const auto &outtup = *get_output_by_index_(0);
-                unpack_outputs_(outtup, outs...);
+                unpack_output_(outtup, outs...);
             }
 
-            void get_output(const size_t idx, Outputs*... outs) const
+            void get_output(const size_t idx, Outputs *...outs) const
             {
                 const auto &outtup = *get_output_by_index_(idx);
-                unpack_outputs_(outtup, outs...);
+                unpack_output_(outtup, outs...);
             }
 
-            void get_output(const std::string_view name, Outputs*... outs) const
+            void get_output(const std::string_view name, Outputs *...outs) const
             {
                 const auto &outtup = *get_output_by_name_(name);
-                unpack_outputs_(outtup, outs...);
+                unpack_output_(outtup, outs...);
             }
 
             /*
