@@ -11,6 +11,7 @@
 #include <string_view>
 
 #include "ErrorStats.hpp"
+#include "Gbench.hpp"
 
 namespace ComPPare
 {
@@ -54,6 +55,13 @@ namespace ComPPare
             {
                 std::string name;
                 Func fn;
+                bool wants_gb = false;
+
+                Impl &gbench()
+                { // chain-call helper
+                    wants_gb = true;
+                    return *this;
+                }
             };
             // Vector to hold all implementations
             std::vector<Impl> impls_;
@@ -140,17 +148,19 @@ namespace ComPPare
             // Function to set a reference implementation
             template <typename F>
                 requires std::invocable<F, const Inputs &..., Outputs &..., size_t, double &>
-            void set_reference(std::string name, F &&f)
+            Impl &set_reference(std::string name, F &&f)
             {
                 impls_.insert(impls_.begin(), {std::move(name), Func(std::forward<F>(f))});
+                return impls_.front();
             }
 
             // Function to add an implementation to the comparison
             template <typename F>
                 requires std::invocable<F, const Inputs &..., Outputs &..., size_t, double &>
-            void add(std::string name, F &&f)
+            Impl &add(std::string name, F &&f)
             {
                 impls_.push_back({std::move(name), Func(std::forward<F>(f))});
+                return impls_.back();
             }
 
             /*
@@ -200,7 +210,11 @@ namespace ComPPare
             tol -- the tolerance for error comparison
             warmup -- if true, runs a warmup iteration before the actual timing
             */
-            void run(size_t iters = 10, double tol = 1e-6, bool warmup = true)
+            void run(int &argc,
+                     char **argv,
+                     size_t iters = 10,
+                     double tol = 1e-6,
+                     bool warmup = true)
             {
                 if (impls_.empty())
                 {
@@ -339,6 +353,32 @@ namespace ComPPare
 
                     std::cout << '\n';
                 } /* for impls */
+
+                internal::gbench_manager gb;
+                bool any_gb = false;
+                for (const auto &impl : impls_)
+                    if (impl.wants_gb)
+                    {
+                        any_gb = true;
+                        break;
+                    }
+
+                if (any_gb)
+                {
+                    gb.initialize(argc, argv);
+                    for (const auto &impl : impls_)
+                        if (impl.wants_gb)
+                        {
+                            OutTup tmpout;
+                            double tmproi;
+                            std::apply([&](auto &&...in_vals)
+                                       { std::apply([&](auto &&...out_refs)
+                                                    { gb.add_gbench(impl.name.c_str(),
+                                                                    impl.fn,
+                                                                    in_vals..., out_refs..., size_t{1}, tmproi); }, tmpout); }, inputs_);
+                        }
+                    gb.run(); // prints GB report & Shutdown()
+                }
             } /* run */
         }; /* OutputContext */
     }; /* InputContext */
