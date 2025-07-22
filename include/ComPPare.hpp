@@ -9,12 +9,79 @@
 #include <array>
 #include <memory>
 #include <string_view>
+#include <concepts>
 
+#include "param.hpp"
 #include "ErrorStats.hpp"
 #include "Gbench.hpp"
 
 namespace ComPPare
 {
+    namespace bench
+    {
+        template <class InTup, class OutTup>
+        class BenchmarkAdapter
+        {
+        public:
+            virtual ~BenchmarkAdapter() = default;
+            virtual void initialize(int& /*argc*/, char** /*argv*/) {}
+            virtual void finalize() {}
+        };
+
+        template <class InTup, class OutTup>
+        class GoogleBenchmarkAdapter final : public BenchmarkAdapter<InTup, OutTup>
+        {
+            using Self = GoogleBenchmarkAdapter<InTup,OutTup>;
+            using Func = std::function<void(const InTup&, OutTup&)>;
+            internal::gbench_manager gb_;
+        public:
+            using handle_type = ::benchmark::internal::Benchmark*;
+
+            GoogleBenchmarkAdapter(const GoogleBenchmarkAdapter&)            = delete;
+            GoogleBenchmarkAdapter& operator=(const GoogleBenchmarkAdapter&) = delete;
+
+            static std::shared_ptr<Self> instance()
+            {
+                static std::shared_ptr<Self> inst{new Self};
+                return inst;
+            }
+
+            template <class F>
+            handle_type register_impl(const std::string& name,
+                                    F&&                user_fn,
+                                    const InTup&       inputs,
+                                    OutTup&            outs)
+            {
+                return std::apply([&](auto const&... in_vals)
+                {
+                    return std::apply([&](auto&&... outs_vals)
+                    {
+                        return gb_.add_gbench(name.c_str(),
+                                                std::forward<F>(user_fn),
+                                                in_vals..., outs_vals...);
+                    }, outs);
+                }, inputs);
+            }
+
+            void initialize(int& argc, char** argv) override { gb_.initialize(argc, argv); }
+            void finalize() override                         { gb_.run();                 }
+
+        private:
+            GoogleBenchmarkAdapter() = default;
+        };
+
+    } // namespace bench
+    
+    static void DoNotOptimize(void *p)
+    {
+        asm volatile("" : : "g"(p) : "memory");
+    }
+
+    static void ClobberMemory()
+    {
+        asm volatile("" ::: "memory");
+    }
+
     /*
     InputContext class template to hold input parameters for the comparison framework.
     */
@@ -31,8 +98,7 @@ namespace ComPPare
         private:
             // Alias for the user-provided function signature:
             // (const Inputs&..., Outputs&..., size_t iterations, double& roi_us)
-            using Func = std::function<void(const Inputs &..., Outputs &...,
-                                            size_t, double &)>;
+            using Func = std::function<void(const Inputs &..., Outputs &...)>;
 
             // Alias for the error statistics class
             using ErrorStats = ComPPare::internal::ErrorStats;
@@ -50,19 +116,53 @@ namespace ComPPare
             // Reference output tuple to hold the outputs of the first implementation
             OutVec outputs_;
 
-            // Struct to hold the function name and function pointer
+            std::vector<std::shared_ptr<bench::BenchmarkAdapter<InTup,OutTup>>> adapters_;
+
+                    void register_adapter(const std::shared_ptr<bench::BenchmarkAdapter<InTup,OutTup>>& p)
+        {
+            if (std::find(adapters_.begin(), adapters_.end(), p) == adapters_.end())
+                adapters_.push_back(p);
+        }
+
+
             struct Impl
             {
                 std::string name;
                 Func fn;
-                bool wants_gb = false;
+                
+                InTup* inputs_ptr; 
+                OutputContext* parent_ctx;
 
-                Impl &gbench()
-                { // chain-call helper
-                    wants_gb = true;
-                    return *this;
+                std::unique_ptr<OutTup> externalbench_output = nullptr; // for external benchmarks
+
+                decltype(auto) gbench()
+                {
+                    return attach<bench::GoogleBenchmarkAdapter>();
+                }
+
+                template <template<class,class> class Adapter>
+                requires std::is_base_of_v<bench::BenchmarkAdapter<InTup,OutTup>, Adapter<InTup,OutTup>>
+                decltype(auto) attach()
+                {
+                    using A = Adapter<InTup,OutTup>;
+                    auto adp = A::instance();
+
+                    parent_ctx->register_adapter(adp);
+
+                    externalbench_output = std::make_unique<OutTup>();
+
+                    // if constexpr (requires { typename A::handle_type; })
+                    // {
+                        return adp->register_impl(name, fn, *inputs_ptr, *externalbench_output);
+                    // }
+                    // else
+                    // {
+                    //     adp->register_impl(name, fn, *inputs_ptr, *externalbench_output);
+                    //     return *this;
+                    // }
                 }
             };
+
             // Vector to hold all implementations
             std::vector<Impl> impls_;
 
@@ -147,21 +247,39 @@ namespace ComPPare
 
             // Function to set a reference implementation
             template <typename F>
-                requires std::invocable<F, const Inputs &..., Outputs &..., size_t, double &>
+                requires std::invocable<F, const Inputs &..., Outputs &...>
             Impl &set_reference(std::string name, F &&f)
             {
-                impls_.insert(impls_.begin(), {std::move(name), Func(std::forward<F>(f))});
+                impls_.insert(impls_.begin(), {std::move(name), Func(std::forward<F>(f)), &inputs_, this});
                 return impls_.front();
             }
 
             // Function to add an implementation to the comparison
             template <typename F>
-                requires std::invocable<F, const Inputs &..., Outputs &..., size_t, double &>
+                requires std::invocable<F, const Inputs &..., Outputs &...>
             Impl &add(std::string name, F &&f)
             {
-                impls_.push_back({std::move(name), Func(std::forward<F>(f))});
+                impls_.push_back({std::move(name), Func(std::forward<F>(f)), &inputs_, this});
                 return impls_.back();
             }
+
+            // // Function to set a reference implementation
+            // template <typename F>
+            //     requires std::invocable<F, const Inputs &..., Outputs &...>
+            // decltype(auto) set_reference(std::string name, F &&f)
+            // {
+            //     impls_.insert(impls_.begin(), {std::move(name), Func(std::forward<F>(f))});
+            //     return *this;
+            // }
+
+            // // Function to add an implementation to the comparison
+            // template <typename F>
+            //     requires std::invocable<F, const Inputs &..., Outputs &...>
+            // decltype(auto) add(std::string name, F &&f)
+            // {
+            //     impls_.push_back({std::move(name), Func(std::forward<F>(f))});
+            //     return *this;
+            // }
 
             /*
             Getter for the output results
@@ -212,9 +330,7 @@ namespace ComPPare
             */
             void run(int &argc,
                      char **argv,
-                     size_t iters = 10,
-                     double tol = 1e-6,
-                     bool warmup = true)
+                     double tol = 1e-6)
             {
                 if (impls_.empty())
                 {
@@ -253,21 +369,6 @@ namespace ComPPare
 
                     OutTup outs;
 
-                    double roi_us = 0.0; // roi time in microseconds
-
-                    // warmup run of 1 iteration
-                    if (warmup)
-                    {
-                        OutTup outs_warmup;
-                        double roi_us_warmup = 0.0;
-                        std::apply([&](auto const &...in)
-                                   { std::apply(
-                                         [&](auto &...out)
-                                         { impl.fn(in..., out..., 1, roi_us_warmup); },
-                                         outs_warmup); }, inputs_);
-                    }
-
-                    // Measure the time taken by the function
                     auto t0 = std::chrono::high_resolution_clock::now();
                     /*
                     use std::apply to unpack the inputs and outputs completely to do 1 function call of the implementation
@@ -277,12 +378,12 @@ namespace ComPPare
                     std::apply([&](auto const &...in)
                                { std::apply(
                                      [&](auto &...out)
-                                     { impl.fn(in..., out..., iters, roi_us); },
+                                     { impl.fn(in..., out...); },
                                      outs); }, inputs_);
                     auto t1 = std::chrono::high_resolution_clock::now();
-                    // end of timing
 
                     // Calculate the time taken by the function in microseconds
+                    double roi_us = ComPPare::param::get_roi_us();
                     double func_us = std::chrono::duration<double, std::micro>(t1 - t0).count();
                     double ovhd_us = func_us - roi_us;
 
@@ -354,32 +455,58 @@ namespace ComPPare
                     std::cout << '\n';
                 } /* for impls */
 
-                internal::gbench_manager gb;
-                bool any_gb = false;
-                for (const auto &impl : impls_)
-                    if (impl.wants_gb)
-                    {
-                        any_gb = true;
-                        break;
-                    }
+                // bool any_gb = false;
+                // for (const auto &impl : impls_)
+                //     if (impl.wants_gb)
+                //     {
+                //         any_gb = true;
+                //         break;
+                //     }
 
-                if (any_gb)
-                {
-                    gb.initialize(argc, argv);
-                    for (const auto &impl : impls_)
-                        if (impl.wants_gb)
-                        {
-                            OutTup tmpout;
-                            double tmproi;
-                            std::apply([&](auto &&...in_vals)
-                                       { std::apply([&](auto &&...out_refs)
-                                                    { gb.add_gbench(impl.name.c_str(),
-                                                                    impl.fn,
-                                                                    in_vals..., out_refs..., size_t{1}, tmproi); }, tmpout); }, inputs_);
-                        }
-                    gb.run(); // prints GB report & Shutdown()
-                }
+                // call adapter hooks once each – adapters_ already unique
+                for (auto& a : adapters_) a->initialize(argc, argv);
+                for (auto& a : adapters_) a->finalize();
             } /* run */
         }; /* OutputContext */
     }; /* InputContext */
 } // namespace ComPPare
+
+#define HOTLOOPSTART \
+    auto &&hotloop_body = [&]() { /* start of lambda */
+
+#define COMPPARE_HOTLOOPEND                                 \
+    /* Warm-up */                                           \
+    for (std::size_t i = 0; i < COMPPARE_WARMUP_ITERS; ++i) \
+        hotloop_body();                                     \
+                                                            \
+    /* Timed */                                             \
+    auto t0 = std::chrono::steady_clock::now();             \
+    for (std::size_t i = 0; i < COMPPARE_BENCH_ITERS; ++i)  \
+        hotloop_body();                                     \
+    auto t1 = std::chrono::steady_clock::now();             \
+                                                            \
+    ComPPare::param::roi_us =                               \
+        std::chrono::duration<double, std::micro>(t1 - t0).count();
+
+#define GBENCH_HOTLOOPEND                              \
+    benchmark::State &st = *ComPPare::param::gb_state; \
+    for (auto _ : st)                                  \
+    {                                                  \
+        hotloop_body();                                \
+    }
+
+#define HOTLOOPEND                      \
+    }                                   \
+    ; /* end of lambda */               \
+                                        \
+    if (ComPPare::param::inside_gbench) \
+    {                                   \
+        GBENCH_HOTLOOPEND               \
+    }                                   \
+    else                                \
+    {                                   \
+        COMPPARE_HOTLOOPEND             \
+    }
+
+#define HOTLOOP(LOOP_BODY) \
+    HOTLOOPSTART LOOP_BODY HOTLOOPEND

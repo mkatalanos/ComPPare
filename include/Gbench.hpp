@@ -1,4 +1,5 @@
 #pragma once
+#include "param.hpp"
 #include <benchmark/benchmark.h>
 #include <cstring>
 #include <sstream>
@@ -25,21 +26,24 @@ namespace ComPPare::internal
         }
 
         template <typename Func, typename... Args>
-        inline void add_gbench(const char *name, Func f, Args &&...args)
+        ::benchmark::internal::Benchmark* add_gbench(const char *name, Func f, Args &&...args)
         {
-            using TupleT = std::tuple<Args...>;
-            TupleT cargs(std::forward<Args>(args)...);
-            ::benchmark::RegisterBenchmark(
+            std::tuple<Args...> cargs(std::forward<Args>(args)...);
+            
+            auto benchptr = ::benchmark::RegisterBenchmark(
                 name,
                 [f, cargs = std::move(cargs)](::benchmark::State &st) mutable
                 {
-                    for (auto _ : st)
-                    {
+                    ComPPare::param::gbench_scope scope(st);
+                    // for (auto _ : st)
+                    // {
                         std::apply([&](auto &&...unpacked)
                                    { f(std::forward<decltype(unpacked)>(unpacked)...); }, cargs);
                         ::benchmark::ClobberMemory();
-                    }
+                    // }
                 });
+
+            return benchptr;
         }
 
         void run()
