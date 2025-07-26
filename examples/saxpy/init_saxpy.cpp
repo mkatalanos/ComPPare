@@ -2,7 +2,6 @@
 #include <cstring>
 #include <stdexcept>
 #include <iostream>
-#include <cmath>
 #include <random>
 
 #include "init_saxpy.hpp"
@@ -24,21 +23,9 @@ SaxpyConfig init_saxpy(int argc, char **argv)
         {
             cfg.a = std::stof(argv[++i]);
         }
-        else if (key == "--iter" && i + 1 < argc)
-        {
-            cfg.iters = std::stoull(argv[++i]);
-        }
         else if (key == "--tol" && i + 1 < argc)
         {
             cfg.tol = std::stod(argv[++i]);
-        }
-        else if (key == "--warmup")
-        {
-            cfg.warmup = true;
-        }
-        else if (key == "--no-warmup")
-        {
-            cfg.warmup = false;
         }
         else
         {
@@ -69,8 +56,6 @@ SaxpyConfig init_saxpy(int argc, char **argv)
     std::cout << "\n=== SAXPY Benchmark Parameters ===\n";
     std::cout << "Vector size (N)     : " << cfg.N << '\n';
     std::cout << "Scalar a            : " << cfg.a << '\n';
-    std::cout << "Iterations          : " << cfg.iters << '\n';
-    std::cout << "Error tolerance     : " << cfg.tol << '\n';
     std::cout << "===================================\n\n";
 
     return cfg;

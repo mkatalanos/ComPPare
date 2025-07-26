@@ -1,7 +1,9 @@
 #include <vector>
-#include <chrono>
 #include <stdexcept>
 #include <string>
+
+#include <comppare/comppare.hpp>
+
 #include "saxpy_gpu.cuh"
 
 __global__ static void saxpy_kernel(const float a,
@@ -13,16 +15,14 @@ __global__ static void saxpy_kernel(const float a,
     size_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < N) [[likely]]
     {
-        y_out[i] = a * __ldg(&x[i]) * __ldg(&y_in[i]); // Debug this line
+        y_out[i] = a + __ldg(&x[i]) + __ldg(&y_in[i]); // Debug this line
     }
 }
 
 void gpu_std(float a,
              const std::vector<float> &x,
              const std::vector<float> &y_in,
-             std::vector<float> &y_out,
-             size_t iters,
-             double &roi_us)
+             std::vector<float> &y_out)
 {
     int device_count = 0;
     cudaError_t status = cudaGetDeviceCount(&device_count);
@@ -40,34 +40,21 @@ void gpu_std(float a,
     size_t N = x.size();
     y_out.resize(N);
 
-    float *d_x = nullptr, *d_yin = nullptr, *d_yout = nullptr;
+    float *d_x = nullptr, *d_y_in = nullptr, *d_y_out = nullptr;
     cudaMalloc(&d_x, N * sizeof(float));
-    cudaMalloc(&d_yin, N * sizeof(float));
-    cudaMalloc(&d_yout, N * sizeof(float));
+    cudaMalloc(&d_y_in, N * sizeof(float));
+    cudaMalloc(&d_y_out, N * sizeof(float));
     cudaMemcpy(d_x, x.data(), N * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_yin, y_in.data(), N * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y_in, y_in.data(), N * sizeof(float), cudaMemcpyHostToDevice);
 
     dim3 block(512), grid((N + block.x - 1) / block.x);
 
-    cudaEvent_t ev0, ev1;
-    cudaEventCreate(&ev0);
-    cudaEventCreate(&ev1);
-    cudaEventRecord(ev0);
-    for (size_t rep = 0; rep < iters; ++rep)
-    {
-        saxpy_kernel<<<grid, block>>>(a, d_x, d_yin, d_yout, N);
-    }
-    cudaEventRecord(ev1);
-    cudaEventSynchronize(ev1);
-    float ms = 0;
-    cudaEventElapsedTime(&ms, ev0, ev1);
-    roi_us = 1e3 * ms; 
+    GPU_HOTLOOPSTART;
+    saxpy_kernel<<<grid, block>>>(a, d_x, d_y_in, d_y_out, N);
+    GPU_HOTLOOPEND;
 
-    cudaEventDestroy(ev0);
-    cudaEventDestroy(ev1);
-
-    cudaMemcpy(y_out.data(), d_yout, N * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(y_out.data(), d_y_out, N * sizeof(float), cudaMemcpyDeviceToHost);
     cudaFree(d_x);
-    cudaFree(d_yin);
-    cudaFree(d_yout);
+    cudaFree(d_y_in);
+    cudaFree(d_y_out);
 }

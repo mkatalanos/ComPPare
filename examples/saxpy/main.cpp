@@ -1,8 +1,7 @@
 #include <vector>
-#include <numeric>
-#include <random>
 
-#include "ComPPare.hpp"
+#include <comppare/comppare.hpp>
+
 #include "saxpy_cpu.hpp"
 #include "init_saxpy.hpp"
 #if (HAVE_CUDA)
@@ -18,7 +17,7 @@ int main(int argc, char **argv)
     using ScalarType = float;
     using VectorType = std::vector<float>;
 
-    ComPPare::
+    comppare::
         InputContext<ScalarType, VectorType, VectorType>::
             OutputContext<VectorType>
                 compare(cfg.a, cfg.x, cfg.y);
@@ -27,15 +26,12 @@ int main(int argc, char **argv)
     compare.set_reference("cpu serial", cpu_std);
     // Add implementations to compare
     compare.add("cpu parallel", cpu_par);
-#if (HAVE_NVHPC)
-    compare.add("gpu std par", gpu_std_par);
-#endif
 #if (HAVE_CUDA)
     compare.add("gpu kernel", gpu_std);
 #endif
 
     // Run the comparison with specified iterations and tolerance
-    compare.run(cfg.iters, cfg.tol, cfg.warmup);
+    compare.run(argc, argv, cfg.tol);
 
     return 0;
 }

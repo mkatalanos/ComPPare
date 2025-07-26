@@ -1,11 +1,11 @@
-#include "ComPPare.hpp"
 #include "max_cpu.hpp"
 #include "init_max.hpp"
 #include "common.hpp"
 #ifdef HAVE_CUDA
 #include "max_gpu.cuh"
-// #include "max_gpu_opt.cuh"
 #endif
+
+#include <comppare/comppare.hpp>
 
 int main(int argc, char **argv)
 {
@@ -13,9 +13,9 @@ int main(int argc, char **argv)
     MaxConfig cfg = init_max(argc, argv);
 
     // Define the input and output types for the comparison framework instance
-    ComPPare::
-        InputContext<std::span<const float_t>>::
-            OutputContext<float_t>
+    comppare::
+        InputContext<std::span<const float>>::
+            OutputContext<float>
                 compare(cfg.data);
 
     // Set reference implementation
@@ -29,13 +29,7 @@ int main(int argc, char **argv)
 #endif
 
     // Run the comparison with specified iterations and tolerance
-    compare.run(cfg.iters, cfg.tol, cfg.warmup);
-
-    #ifdef HAVE_CUDA
-        cudaFreeHost(cfg.data.data());
-    #else
-        delete[] cfg.data.data();
-    #endif
+    compare.run(argc, argv, cfg.tol);
 
     return 0;
 }
