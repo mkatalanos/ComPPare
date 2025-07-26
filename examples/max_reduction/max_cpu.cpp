@@ -10,16 +10,14 @@
 
 #include "max_cpu.hpp"
 
-void cpu_max_serial(std::span<const float> in,
-                    float &out)
+void cpu_max_serial(std::span<const float> in, float &out)
 {
     HOTLOOPSTART;
     out = *std::max_element(in.data(), in.data() + in.size());
     HOTLOOPEND;
 }
 
-void cpu_max_omp(std::span<const float> in,
-                 float &out)
+void cpu_max_omp(std::span<const float> in, float &out)
 {
     HOTLOOPSTART;
 #pragma omp parallel for reduction(max : out) schedule(static)
@@ -28,8 +26,7 @@ void cpu_max_omp(std::span<const float> in,
     HOTLOOPEND;
 }
 
-void cpu_max_thread(std::span<const float> in,
-                    float &out)
+void cpu_max_thread(std::span<const float> in, float &out)
 {
     const unsigned num_threads = std::thread::hardware_concurrency();
 
