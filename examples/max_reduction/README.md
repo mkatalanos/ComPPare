@@ -116,3 +116,66 @@ gpu kernel                     133597.43            32933.28           100664.15
 gpu kernel opt                 109846.87            20369.54            89477.33            0.00e+00
 ```
 
+
+## Implementation of ComPPare in this example
+
+### Basic Usage of `HOTLOOP` macro
+Adding `HOTLOOPSTART` and `HOTLOOPEND` macros to the region you want to benchmark.
+It will run the region with certain iterations of warmup (default=100) before running another certain number of iterations for benchmark (default=100).
+
+```c
+// max_cpu.cpp
+void cpu_max_serial(std::span<const float> in, float &out)
+{
+    HOTLOOPSTART;   // Start of Region you want to benchmark
+    out = *std::max_element(in.data(), in.data() + in.size());
+    HOTLOOPEND;     // End of Region you want to benchmark
+}
+```
+
+### More advanced usage -- Manual Timing
+In some cases, there are certain regions we want to NOT benchmark, for instance memory transfer overhead etc. 
+Macros like `GPU_START_MANUAL_TIMER` and `GPU_STOP_MANUAL_TIMER` allows users to only target certain region within the whole loop.
+
+
+```c
+// max_gpu.cu
+template <void (*KERNEL)(const int, float *__restrict__, const float *__restrict__)>
+void gpu_max(std::span<const float> in, float &out)
+{
+    ...
+
+    GPU_HOTLOOPSTART;
+
+    /* Region you want to ignore but in loop -- say memory transfer */
+
+    GPU_START_MANUAL_TIMER;
+    /* Region you want to time */
+    GPU_STOP_MANUAL_TIMER;
+
+    /* Region you want to ignore but in loop */
+
+    GPU_HOTLOOPEND;
+
+    ...
+}
+```
+
+### ComPPare in `main()`
+
+First create the the instance of comppare by providing the input type(s) in InputContext (`std::span<const float>` in this case) and the output type(s) in OutputContext (`float` in this case).
+Then initialize the instance with input data. 
+```c
+comppare::
+        InputContext<std::span<const float>>::
+            OutputContext<float>
+                compare(/*type: std::span<const float>*/input_data);
+```
+
+Set Reference function and add other functions for comparison
+```c
+    // Set reference implementation
+    compare.set_reference("cpu serial", cpu_max_serial);
+    // Add implementations to compare
+    compare.add("cpu omp", cpu_max_omp);
+```

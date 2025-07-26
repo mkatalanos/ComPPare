@@ -131,3 +131,53 @@ gpu kernel                      73151.41                1.07            73150.34
 ```
 
 > Note: The gpu kernel example in saxpy_gpu.cu deliberately contains a bug that causes the validation to fail (<-- FAIL). You’ll need to debug and correct the GPU implementation in `saxpy_gpu.cu`
+
+## Implementation of ComPPare in this example 
+
+### Basic Usage of `HOTLOOP` Macro
+Adding `HOTLOOPSTART` and `HOTLOOPEND` macros to the region you want to benchmark.
+It will run the region with certain iterations of warmup (default=100) before running another certain number of iterations for benchmark (default=100).
+
+```c
+// saxpy_cpu.cpp
+void cpu_std(float a,
+             const std::vector<float> &x,
+             const std::vector<float> &y_in,
+             std::vector<float> &y_out)
+{
+    size_t N = x.size();
+    y_out.resize(N);
+
+    HOTLOOPSTART;   // Start of Region you want to benchmark
+    for (size_t i = 0; i < N; ++i)
+    {
+        y_out[i] = a * x[i] + y_in[i];
+    }
+    HOTLOOPEND;     // End of Region you want to benchmark
+}
+
+```
+
+### `HOTLOOP` Macro for GPU
+`HOTLOOP` macro for gpu (CUDA/HIP) uses the `GPU_HOTLOOPSTART` and `GPU_GPU_HOTLOOPEND` macros as they use [cudaEventSynchronize()](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__EVENT.html#group__CUDART__EVENT_1g949aa42b30ae9e622f6ba0787129ff22)/[hipEventSynchronize()](https://rocm.docs.amd.com/projects/HIP/en/develop/doxygen/html/group___event.html#ga1f72d98ba5d6f7dc3da54e0c41fe38b1) to time the completion of kernels on device.  
+
+
+
+```c
+// saxpy_gpu.cu
+void gpu_std(float a,
+             const std::vector<float> &x,
+             const std::vector<float> &y_in,
+             std::vector<float> &y_out)
+{
+    ...
+
+    GPU_HOTLOOPSTART;   // Start of Region you want to benchmark
+
+    saxpy_kernel<<<grid, block>>>(a, d_x, d_y_in, d_y_out, N);
+    
+    GPU_HOTLOOPEND;     // End of Region you want to benchmark
+
+    ...
+}
+```
