@@ -24,12 +24,20 @@ mkdir build && cd build
 
 cmake \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCUDA=ON \
-    -DCUDA_ARCH=70 \
+    -DUSE_CUDA=ON \
     ..
 
 make
 ````
+
+#### Optional GPU build option
+```bash
+cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DUSE_CUDA=ON \
+    -DCUDA_ARCH=90 \ #Optional: Specify CUDA Architecture 
+    ..
+```
 
 
 ### CPU only Build (default)
@@ -47,7 +55,7 @@ mkdir build && cd build
 
 cmake \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCUDA=OFF \
+    -DUSE_CUDA=OFF \
     ..
 
 make
@@ -66,14 +74,12 @@ The executable takes the following command-line arguments:
 | Flag      | Description                        | Default         |
 | --------- | ---------------------------------- | --------------- |
 | `--size`      | log2 of vector size (`N = 2^n`)    | 26              |
-| `--iter`   | number of benchmark iterations     | 10              |
-| `--tol`    | numerical tolerance for validation | 1e-6            |
-| `--warmup/--no-warmup` | to do warmup run or not | warmup |
+
 
 ### Example
 
 ```bash
-./max_reduction --size 28 --iter 20 --tol 1e-7
+./max_reduction --size 18
 ```
 
 
@@ -84,23 +90,29 @@ Output will print:
 * Function execution time
 * Core compute time (isolated)
 * Overhead (e.g., memory copies)
-* Validation metrics: max, mean, total error
-* if max error > tolerance --> index of the max error (where)
+* Error of Max Val against reference
 
 ---
 
 ```bash
 === Max Reduction Benchmark Parameters ===
-Vector size (N)     : 268435456
-Iterations          : 20
-Error tolerance     : 1e-07
+Vector size (N)     : 262144
 ===================================
 
-Name                        Func µs           ROI µs          Ovhd µs       Max|err|[0]      (MaxErr-idx)      Mean|err|[0]     Total|err|[0]
-cpu serial               15708841.11       15708840.00              1.11          0.00e+00               —          0.00e+00          0.00e+00
-cpu omp                    250068.62         250067.00              1.62          0.00e+00               —          0.00e+00          0.00e+00
-cpu thread                 937883.36         937882.00              1.36          0.00e+00               —          0.00e+00          0.00e+00
-gpu kernel                1830507.95          66976.77        1763531.18          0.00e+00               —          0.00e+00          0.00e+00
-gpu kernel opt            1792535.98          33857.54        1758678.45          0.00e+00               —          0.00e+00          0.00e+00
+*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
+============ ComPPare Framework ============
+=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
+
+Number of implementations:             5
+Warmup iterations:                   100
+Benchmark iterations:                100
+=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
+
+Implementation                  Func µs             ROI µs            Ovhd µs       Total|err|[0]
+cpu serial                      36303.95            17437.95            18866.00            0.00e+00
+cpu omp                        107208.48            62084.54            45123.94            0.00e+00
+cpu thread                      44459.22            21151.77            23307.45            0.00e+00
+gpu kernel                     133597.43            32933.28           100664.15            0.00e+00
+gpu kernel opt                 109846.87            20369.54            89477.33            0.00e+00
 ```
 

@@ -2,21 +2,22 @@
 #include "common.hpp"
 #include "max_gpu.cuh"
 #include <span>
+#include <comppare/comppare.hpp>
 
 // Minimum size for initialising shared memory in CUDA kernels
-__device__ constexpr float_t MINSIZE = std::numeric_limits<float_t>::lowest();
+__device__ constexpr float MINSIZE = std::numeric_limits<float>::lowest();
 
 // instantiating the template function for both kernels
-template void gpu_max<max_kernel>(std::span<const float_t>, float_t &, const size_t, double &);
-template void gpu_max<max_kernel_warpsemantics>(std::span<const float_t>, float_t &, const size_t, double &);
+template void gpu_max<max_kernel>(std::span<const float>, float &);
+template void gpu_max<max_kernel_warpsemantics>(std::span<const float>, float &);
 
 // CUDA kernel to find the maximum value in an array
 __global__ void max_kernel(const int thread_max,
-                           float_t *__restrict__ max_output,
-                           const float_t *__restrict__ d_input)
+                           float *__restrict__ max_output,
+                           const float *__restrict__ d_input)
 {
 
-    __shared__ float_t shared_var[BLOCKSIZE];
+    __shared__ float shared_var[BLOCKSIZE];
 
     int local_thread = threadIdx.x; // thread number within block
 
@@ -50,7 +51,7 @@ __global__ void max_kernel(const int thread_max,
     {
         if (local_thread < stride)
         {
-            shared_var[local_thread] = float_t_max(shared_var[local_thread], shared_var[local_thread + stride]);
+            shared_var[local_thread] = fmaxf(shared_var[local_thread], shared_var[local_thread + stride]);
         }
         __syncthreads();
     }
@@ -64,17 +65,49 @@ __global__ void max_kernel(const int thread_max,
     }
 }
 
+/*
+warp shuffle reduction
+NVIDIA BLOG: https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/
+CUDA Documentation: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html?highlight=warp#warp-shuffle-functions
+
+__shfl_down_sync is part of the "synchronized data exchange" warp primitives
+it allows threads within in a warp to exchange data even if they are in registers
+
+__shfl_down_sync(0xffffffff, warp_max, 16);
+moves data from thread i to i-16 (or named as "lane" in correct terminology)
+then compares the value in thread i with the value in thread i-16
+and returns the maximum of the two values
+(0xffffffff is the mask for all threads in the warp, meaning all threads can participate in the shuffle)
+
+this is repeated until all threads in the warp have been compared (16, 8, 4, 2, 1)
+
+**
+NOTE: __reduce_max_sync() can be used instead of the manual reduction for int32 only
+in our case we are using fp32, so we have to do it manually
+**
+
+*/
+#define warp_size 32
+static __forceinline__ __device__ void warp_reduce_max(float &warpmax)
+{
+#pragma unroll 
+    for (int offset = warp_size / 2; offset > 0; offset >>= 1)
+    {
+        warpmax = fmaxf(warpmax, __shfl_down_sync(0xffffffff, warpmax, offset));
+    }
+}
+
 // CUDA kernel to find the maximum value in an array using warp shuffle semantics
 __global__ void max_kernel_warpsemantics(const int thread_max,
-                                         float_t *__restrict__ max_output,
-                                         const float_t *__restrict__ d_input)
+                                         float *__restrict__ max_output,
+                                         const float *__restrict__ d_input)
 {
 
     unsigned int local_thread = threadIdx.x;
     unsigned int global_thread = blockIdx.x * blockDim.x + threadIdx.x;
 
     // shared memory only for second level of reduction
-    __shared__ float_t shared_var[32];
+    __shared__ float shared_var[32];
 
     // Initialize shared memory for the second level of reduction
     if (local_thread < 32)
@@ -87,42 +120,9 @@ __global__ void max_kernel_warpsemantics(const int thread_max,
         return;
 
     // load data from global memory into registers
-    float_t warp_max = __ldg(&d_input[global_thread]);
+    float warp_max = __ldg(&d_input[global_thread]);
 
-    float_t tmp;
-
-    /*
-    warp shuffle reduction
-    NVIDIA BLOG: https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/
-    CUDA Documentation: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html?highlight=warp#warp-shuffle-functions
-
-    __shfl_down_sync is part of the "synchronized data exchange" warp primitives
-    it allows threads within in a warp to exchange data even if they are in registers
-
-    __shfl_down_sync(0xffffffff, warp_max, 16);
-    moves data from thread i to i-16 (or named as "lane" in warp terminology)
-    then compares the value in thread i with the value in thread i-16
-    and returns the maximum of the two values
-    (0xffffffff is the mask for all threads in the warp, meaning all threads can participate in the shuffle)
-
-    this is repeated until all threads in the warp have been compared
-
-    **
-    NOTE: __reduce_max_sync() can be used instead of the manual reduction for int32 only
-    in our case we are using fp32 or fp64, so we have to do it manually
-    **
-
-    */
-    tmp = __shfl_down_sync(0xffffffff, warp_max, 16);
-    warp_max = float_t_max(warp_max, tmp);
-    tmp = __shfl_down_sync(0xffffffff, warp_max, 8);
-    warp_max = float_t_max(warp_max, tmp);
-    tmp = __shfl_down_sync(0xffffffff, warp_max, 4);
-    warp_max = float_t_max(warp_max, tmp);
-    tmp = __shfl_down_sync(0xffffffff, warp_max, 2);
-    warp_max = float_t_max(warp_max, tmp);
-    tmp = __shfl_down_sync(0xffffffff, warp_max, 1);
-    warp_max = float_t_max(warp_max, tmp);
+    warp_reduce_max(warp_max);
 
     int warp_id = local_thread >> 5;
     int lane_id = local_thread & 31;
@@ -141,21 +141,12 @@ __global__ void max_kernel_warpsemantics(const int thread_max,
     now we need to reduce those (at most) 32 values to a single maximum value
     using another warp shuffle reduction
     */
-    if (local_thread < 32) // same as warp_id == 0
+    if (local_thread < warp_size) // same as warp_id == 0
     {
         // load the warp_max value from shared memory
-        float_t block_max = shared_var[local_thread];
+        float block_max = shared_var[local_thread];
 
-        tmp = __shfl_down_sync(0xffffffff, block_max, 16);
-        block_max = float_t_max(block_max, tmp);
-        tmp = __shfl_down_sync(0xffffffff, block_max, 8);
-        block_max = float_t_max(block_max, tmp);
-        tmp = __shfl_down_sync(0xffffffff, block_max, 4);
-        block_max = float_t_max(block_max, tmp);
-        tmp = __shfl_down_sync(0xffffffff, block_max, 2);
-        block_max = float_t_max(block_max, tmp);
-        tmp = __shfl_down_sync(0xffffffff, block_max, 1);
-        block_max = float_t_max(block_max, tmp);
+        warp_reduce_max(block_max);
 
         if (local_thread == 0)
         {
@@ -175,66 +166,48 @@ it does not include the time for memory allocation and data transfer.
 **
 
 */
-template <void (*KERNEL)(const int, float_t *__restrict__, const float_t *__restrict__)>
-void gpu_max(std::span<const float_t> in,
-             float_t &out,
-             const size_t iters,
-             double &roi_us)
+template <void (*KERNEL)(const int, float *__restrict__, const float *__restrict__)>
+void gpu_max(std::span<const float> in,
+             float &out)
 {
     // Create Device Pointer
-    float_t *d_input;
-    float_t *d_output;
+    float *d_input;
+    float *d_output;
 
-    cudaMalloc((void **)&d_input, in.size() * sizeof(float_t));
-    cudaMalloc((void **)&d_output, sizeof(float_t) * ceil((static_cast<float>(in.size()) / static_cast<float>((BLOCKSIZE)))));
-    // Create CUDA events for timing
-    cudaEvent_t cudastart, cudaend;
-    cudaEventCreate(&cudastart);
-    cudaEventCreate(&cudaend);
+    cudaMalloc((void **)&d_input, in.size() * sizeof(float));
+    cudaMalloc((void **)&d_output, sizeof(float) * ceil((static_cast<float>(in.size()) / static_cast<float>((BLOCKSIZE)))));
 
-    double roi_ms = 0.0;
-    for (size_t rep = 0; rep < iters; ++rep)
+    GPU_HOTLOOPSTART;
+    // copy input data to device memory and initialize output memory
+    cudaMemcpy(d_input, in.data(), in.size() * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemset(d_output, 0, sizeof(float) * ceil((static_cast<float>(in.size()) / static_cast<float>((BLOCKSIZE)))));
+
+    int array_size = in.size();
+
+    GPU_START_MANUAL_TIMER;
+    /*
+    Each kernel reduces the input array per block and writes the maximum value into the output array.
+    The output array is then reduced again in the next iteration until only one value remains.
+    */
+    while (array_size > 1)
     {
-        // copy input data to device memory and initialize output memory
-        cudaMemcpy(d_input, in.data(), in.size() * sizeof(float_t), cudaMemcpyHostToDevice);
-        cudaMemset(d_output, 0, sizeof(float_t) * ceil((static_cast<float>(in.size()) / static_cast<float>((BLOCKSIZE)))));
-
-        int array_size = in.size();
-        cudaEventRecord(cudastart);
-
-        /*
-        Each kernel reduces the input array per block and writes the maximum value into the output array.
-        The output array is then reduced again in the next iteration until only one value remains.
-        */
-        while (array_size > BLOCKSIZE)
-        {
-            // Calculate the number of blocks needed for the current array size
-            int num_blocks = ceil(static_cast<float>(array_size) / static_cast<float>(BLOCKSIZE));
-            KERNEL<<<num_blocks, BLOCKSIZE>>>(array_size, d_output, d_input);
-            cudaDeviceSynchronize();
-            // Swap input and output pointers for the next iteration
-            std::swap(d_input, d_output);
-            array_size = num_blocks;
-        }
-        // Final reduction for the last block
-        KERNEL<<<1, BLOCKSIZE>>>(array_size, d_output, d_input);
+        // Calculate the number of blocks needed for the current array size
+        int num_blocks = ceil(static_cast<float>(array_size) / static_cast<float>(BLOCKSIZE));
+        KERNEL<<<num_blocks, BLOCKSIZE>>>(array_size, d_output, d_input);
         cudaDeviceSynchronize();
-        cudaEventRecord(cudaend);
-        cudaEventSynchronize(cudaend);
-
-        float ms = 0;
-        cudaEventElapsedTime(&ms, cudastart, cudaend);
-        // accumulate the time for each iteration
-        roi_ms += ms;
+        // Swap input and output pointers for the next iteration
+        std::swap(d_input, d_output);
+        array_size = num_blocks;
     }
-    roi_us = 1e3 * roi_ms; // µs
+    // Final swap to ensure the final result is in d_output
+    std::swap(d_input, d_output);
+    GPU_STOP_MANUAL_TIMER;
+    GPU_HOTLOOPEND;
 
-    cudaMemcpy(&out, d_output, sizeof(float_t), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&out, d_output, sizeof(float), cudaMemcpyDeviceToHost);
 
     // Clean up
     cudaFree(d_input);
     cudaFree(d_output);
-    cudaEventDestroy(cudastart);
-    cudaEventDestroy(cudaend);
 }
 #endif // HAVE_CUDA
