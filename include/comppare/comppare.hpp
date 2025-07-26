@@ -11,9 +11,10 @@
 #include <string_view>
 #include <concepts>
 
+#include <comppare/internal/ansi.hpp>
 #include <comppare/internal/config.hpp>
-#include <comppare/internal/policy.hpp>
 #include <comppare/internal/helper.hpp>
+#include <comppare/internal/policy.hpp>
 #include <comppare/plugin/plugin.hpp>
 
 #ifdef HAVE_GOOGLE_BENCHMARK
@@ -184,7 +185,12 @@ namespace comppare
                   { 
                     for(std::size_t m=0;m<spec_metric_count<I>();++m) 
                     {
-                        std::cout<<std::setw(PRINT_COL_WIDTH)<< (std::string(spec_metric_name<I>(m))+"["+std::to_string(I)+"]");
+                        std::cout<< std::setw(PRINT_COL_WIDTH)<< 
+                        comppare::internal::ansi::UNDERLINE(
+                        comppare::internal::ansi::BOLD(
+                            (std::string(spec_metric_name<I>(m))+"["+std::to_string(I)+"]")
+                        ));
+                        
                     } }()),
                  ...);
             }
@@ -329,10 +335,19 @@ namespace comppare
                      double tol = 1e-6)
             {
                 comppare::internal::helper::parse_args(argc, argv);
-                // print number of warmup and iterations
-                std::cout << "Warmup iterations: " << comppare::config::warmup_iters() << "\n"
-                          << "Benchmark iterations: " << comppare::config::bench_iters() << "\n"
-                          << "Tolerance: " << tol << "\n";
+                std::cout << std::left << comppare::internal::ansi::BOLD
+                          << "*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=\n============ "
+                          << comppare::internal::ansi::ITALIC("ComPPare Framework")
+                          << " ============\n=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*"
+                          << comppare::internal::ansi::BOLD_OFF << "\n\n";
+                std::cout
+                    << std::left << std::setw(30) << "Number of implementations: "
+                    << std::right << std::setw(10) << impls_.size() << "\n"
+                    << std::left << std::setw(30) << "Warmup iterations: "
+                    << std::right << std::setw(10) << comppare::config::warmup_iters() << "\n"
+                    << std::left << std::setw(30) << "Benchmark iterations: "
+                    << std::right << std::setw(10) << comppare::config::bench_iters() << "\n"
+                    << std::left << comppare::internal::ansi::BOLD("=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*") << "\n\n";
 
                 if (impls_.empty())
                 {
@@ -343,8 +358,9 @@ namespace comppare
                 outputs_.reserve(impls_.size()); // reserve space for outputs -- resize and use index works too.
 
                 // Print header for the output table
-                std::cout << std::left
-                          << std::setw(PRINT_COL_WIDTH) << "Name"
+                std::cout << comppare::internal::ansi::UNDERLINE << comppare::internal::ansi::BOLD
+                          << std::left
+                          << std::setw(PRINT_COL_WIDTH) << "Implementation"
                           << std::right
                           << std::setw(PRINT_COL_WIDTH) << "Func µs"
                           << std::setw(PRINT_COL_WIDTH) << "ROI µs"
@@ -387,10 +403,17 @@ namespace comppare
                     }
                     outputs_.push_back(std::make_shared<OutTup>(std::move(outs)));
                     // print row
-                    std::cout << std::left << std::setw(PRINT_COL_WIDTH) << impl.name << std::right << std::setw(PRINT_COL_WIDTH) << std::fixed << std::setprecision(2) << func_us << std::setw(PRINT_COL_WIDTH) << roi_us << std::setw(PRINT_COL_WIDTH) << ovhd_us;
+                    std::cout << std::left << std::setw(PRINT_COL_WIDTH) << comppare::internal::ansi::GREEN(impl.name)
+                              << std::fixed << std::setprecision(2) << std::right
+                              << comppare::internal::ansi::YELLOW
+                              << std::setw(PRINT_COL_WIDTH) << func_us
+                              << std::setw(PRINT_COL_WIDTH) << roi_us
+                              << std::setw(PRINT_COL_WIDTH) << ovhd_us
+                              << comppare::internal::ansi::YELLOW_OFF;
+
                     print_metrics(errs, std::make_index_sequence<NUM_OUT>{});
                     if (k && any_fail(errs, tol, std::make_index_sequence<NUM_OUT>{}))
-                        std::cout << "  <-- FAIL";
+                        std::cout << comppare::internal::ansi::BG_RED("  <-- FAIL");
                     std::cout << '\n';
 
                 } /* for impls */
@@ -416,12 +439,14 @@ namespace comppare
         hotloop_body();                                                \
                                                                        \
     /* Timed */                                                        \
+    comppare::config::reset_roi_us();                                  \
     auto t0 = comppare::config::clock_t::now();                        \
     for (std::size_t i = 0; i < comppare::config::bench_iters(); ++i)  \
         hotloop_body();                                                \
     auto t1 = comppare::config::clock_t::now();                        \
                                                                        \
-    comppare::config::set_roi_us(t0, t1);
+    if (comppare::config::get_roi_us() == double(0.0))                 \
+        comppare::config::set_roi_us(t0, t1);
 
 #ifdef PLUGIN_HOTLOOPEND
 #define HOTLOOPEND                               \
@@ -446,3 +471,97 @@ namespace comppare
 
 #define HOTLOOP(LOOP_BODY) \
     HOTLOOPSTART LOOP_BODY HOTLOOPEND
+
+#define GPU_HOTLOOPSTART \
+    auto &&hotloop_body = [&]() { /* start of lambda */
+
+#if defined(__CUDACC__)
+#define GPU_HOTLOOPEND                                                 \
+    }                                                                  \
+    ; /* end lambda */                                                 \
+    /* Warm-up */                                                      \
+    for (std::size_t i = 0; i < comppare::config::warmup_iters(); ++i) \
+        hotloop_body();                                                \
+                                                                       \
+    /* Timed */                                                        \
+    comppare::config::reset_roi_us();                                  \
+    cudaEvent_t start_, stop_;                                         \
+    cudaEventCreate(&start_);                                          \
+    cudaEventCreate(&stop_);                                           \
+    cudaEventRecord(start_);                                           \
+                                                                       \
+    for (std::size_t i = 0; i < comppare::config::bench_iters(); ++i)  \
+        hotloop_body();                                                \
+                                                                       \
+    cudaEventRecord(stop_);                                            \
+    cudaEventSynchronize(stop_);                                       \
+    float ms_;                                                         \
+    cudaEventElapsedTime(&ms_, start_, stop_);                         \
+    if (comppare::config::get_roi_us() == double(0.0))                 \
+        comppare::config::set_roi_us(1e3 * ms_);                             \
+    cudaEventDestroy(start_);                                          \
+    cudaEventDestroy(stop_);
+
+#elif defined(__HIPCC__)
+
+#define GPU_HOTLOOPEND                                                 \
+    }                                                                  \
+    ; /* end lambda */                                                 \
+    /* Warm-up */                                                      \
+    for (std::size_t i = 0; i < comppare::config::warmup_iters(); ++i) \
+        hotloop_body();                                                \
+                                                                       \
+    /* Timed */                                                        \
+    comppare::config::reset_roi_us();                                  \
+    hipEvent_t start_, stop_;                                          \
+    hipEventCreate(&start_);                                           \
+    hipEventCreate(&stop_);                                            \
+    hipEventRecord(start_);                                            \
+                                                                       \
+    for (std::size_t i = 0; i < comppare::config::bench_iters(); ++i)  \
+        hotloop_body();                                                \
+                                                                       \
+    hipEventRecord(stop_);                                             \
+    hipEventSynchronize(stop_);                                        \
+    float ms_;                                                         \
+    hipEventElapsedTime(&ms_, start_, stop_);                          \
+    if (comppare::config::get_roi_us() == double(0.0))                 \
+        comppare::config::set_roi_us(1e3 *ms_);                             \
+    hipEventDestroy(start_);                                           \
+    hipEventDestroy(stop_);
+
+#endif
+
+#if defined(__CUDACC__)
+#define GPU_START_MANUAL_TIMER                                \
+    cudaEvent_t start_manual_timer, stop_manual_timer; \
+    cudaEventCreate(&start_manual_timer);              \
+    cudaEventCreate(&stop_manual_timer);               \
+    cudaEventRecord(start_manual_timer);
+
+#define GPU_STOP_MANUAL_TIMER                                                       \
+    cudaEventRecord(stop_manual_timer);                                      \
+    cudaEventSynchronize(stop_manual_timer);                                 \
+    float ms_manual;                                                         \
+    cudaEventElapsedTime(&ms_manual, start_manual_timer, stop_manual_timer); \
+    comppare::config::increment_roi_us(1e3 * ms_manual);                           \
+    cudaEventDestroy(start_manual_timer);                                    \
+    cudaEventDestroy(stop_manual_timer);
+
+#elif defined(__HIPCC__)
+#define GPU_START_MANUAL_TIMER                               \
+    hipEvent_t start_manual_timer, stop_manual_timer; \
+    hipEventCreate(&start_manual_timer);              \
+    hipEventCreate(&stop_manual_timer);               \
+    hipEventRecord(start_manual_timer);
+
+#define GPU_STOP_MANUAL_TIMER                                                      \
+    hipEventRecord(stop_manual_timer);                                      \
+    hipEventSynchronize(stop_manual_timer);                                 \
+    float ms_manual;                                                        \
+    hipEventElapsedTime(&ms_manual, start_manual_timer, stop_manual_timer); \
+    comppare::config::increment_roi_us(1e3 * ms_manual);                          \
+    hipEventDestroy(start_manual_timer);                                    \
+    hipEventDestroy(stop_manual_timer);
+
+#endif
