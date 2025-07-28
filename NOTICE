@@ -1,0 +1,2 @@
+Includes benchmark::DoNotOptimize() and benchmark::ClobberMemory() from Google Benchmark,
+copyright 2015 Google Inc., under Apache License 2.0.
