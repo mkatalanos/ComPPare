@@ -10,6 +10,7 @@
 #include <memory>
 #include <string_view>
 #include <concepts>
+#include <stdexcept>
 
 #include <comppare/internal/ansi.hpp>
 #include <comppare/internal/config.hpp>
@@ -23,6 +24,44 @@
 
 namespace comppare
 {
+    /*
+    DoNotOptimize() and ClobberMemory() are utility functions to prevent compiler optimizations
+
+    Reference:
+    CppCon 2015: Chandler Carruth "Tuning C++: Benchmarks, and CPUs, and Compilers! Oh My!"
+    Google Benchmark: https://github.com/google/benchmark
+    */
+    template <typename T>
+    inline __attribute__((always_inline)) void DoNotOptimize(T const &value)
+    {
+        asm volatile("" : : "r,m"(value) : "memory");
+    }
+
+    template <typename T>
+    inline __attribute__((always_inline)) void DoNotOptimize(T &value)
+    {
+#if defined(__clang__)
+        asm volatile("" : "+r,m"(value) : : "memory");
+#else
+        asm volatile("" : "+m,r"(value) : : "memory");
+#endif
+    }
+
+    template <typename T>
+    inline __attribute__((always_inline)) void DoNotOptimize(T &&value)
+    {
+#if defined(__clang__)
+        asm volatile("" : "+r,m"(value) : : "memory");
+#else
+        asm volatile("" : "+m,r"(value) : : "memory");
+#endif
+    }
+
+    inline __attribute__((always_inline)) void ClobberMemory()
+    {
+        asm volatile("" ::: "memory");
+    }
+
     template <typename Value, typename Policy = void>
     struct spec;
 
@@ -57,37 +96,6 @@ namespace comppare
         comppare::internal::policy::ErrorPolicy<
             typename spec<T>::value_t,
             typename spec<T>::policy_t>;
-
-    template <typename T>
-    inline __attribute__((always_inline)) void DoNotOptimize(T const &value)
-    {
-        asm volatile("" : : "r,m"(value) : "memory");
-    }
-
-    template <typename T>
-    inline __attribute__((always_inline)) void DoNotOptimize(T &value)
-    {
-#if defined(__clang__)
-        asm volatile("" : "+r,m"(value) : : "memory");
-#else
-        asm volatile("" : "+m,r"(value) : : "memory");
-#endif
-    }
-
-    template <typename T>
-    inline __attribute__((always_inline)) void DoNotOptimize(T &&value)
-    {
-#if defined(__clang__)
-        asm volatile("" : "+r,m"(value) : : "memory");
-#else
-        asm volatile("" : "+m,r"(value) : : "memory");
-#endif
-    }
-
-    inline __attribute__((always_inline)) void ClobberMemory()
-    {
-        asm volatile("" ::: "memory");
-    }
 
     /*
     InputContext class template to hold input parameters for the comparison framework.
@@ -129,12 +137,14 @@ namespace comppare
             // https://en.cppreference.com/w/cpp/language/sizeof....html
             static constexpr size_t NUM_OUT = sizeof...(Specs);
 
-            std::vector<std::shared_ptr<plugin::Plugin<InTup, OutTup>>> plugins_;
+            std::shared_ptr<plugin::Plugin<InTup, OutTup>> plugins_;
 
             void register_plugin(const std::shared_ptr<plugin::Plugin<InTup, OutTup>> &p)
             {
-                if (std::find(plugins_.begin(), plugins_.end(), p) == plugins_.end())
-                    plugins_.push_back(p);
+                if (!plugins_)
+                    plugins_ = p;
+                else if (plugins_ != p)
+                    throw std::logic_error("Multiple plugins are not supported");
             }
 
             struct Impl
@@ -195,15 +205,15 @@ namespace comppare
                  ...);
             }
             template <std::size_t... I>
-            void compute_errors(PolicyTup &errs, const OutTup &test, const OutTup &ref, double tol, std::index_sequence<I...>)
+            void compute_errors(PolicyTup &errs, const OutTup &test, const OutTup &ref, std::index_sequence<I...>)
             {
-                (comppare::internal::policy::compute_error(std::get<I>(errs), std::get<I>(test), std::get<I>(ref), tol), ...);
+                (comppare::internal::policy::compute_error(std::get<I>(errs), std::get<I>(test), std::get<I>(ref)), ...);
             }
             template <std::size_t... I>
-            bool any_fail(const PolicyTup &errs, double tol, std::index_sequence<I...>) const
+            bool any_fail(const PolicyTup &errs, std::index_sequence<I...>) const
             {
                 bool fail = false;
-                ((fail |= comppare::internal::policy::is_fail(std::get<I>(errs), tol)), ...);
+                ((fail |= comppare::internal::policy::is_fail(std::get<I>(errs))), ...);
                 return fail;
             }
             template <std::size_t... I>
@@ -305,18 +315,24 @@ namespace comppare
             }
 
             // Unpack the outputs into the provided pointers
+            template <typename U = void>
+                requires(sizeof...(Specs) > 0)
             void get_reference_output(val_t<Specs> *...outs) const
             {
                 const auto &outtup = *get_output_by_index_(0);
                 unpack_output_(outtup, outs...);
             }
 
+            template <typename U = void>
+                requires(sizeof...(Specs) > 0)
             void get_output(const size_t idx, val_t<Specs> *...outs) const
             {
                 const auto &outtup = *get_output_by_index_(idx);
                 unpack_output_(outtup, outs...);
             }
 
+            template <typename U = void>
+                requires(sizeof...(Specs) > 0)
             void get_output(const std::string_view name, val_t<Specs> *...outs) const
             {
                 const auto &outtup = *get_output_by_name_(name);
@@ -325,14 +341,13 @@ namespace comppare
 
             /*
             Runs the comparison for all added implementations.
-            Arguments:
-            iterations -- the number of iteratins inside each custom function
-            tol -- the tolerance for error comparison
-            warmup -- if true, runs a warmup iteration before the actual timing
+            Optional Arguments:
+            - argc: Number of command line arguments
+            - argv: Array of command line arguments
+            This function will parse the command line arguments to set warmup, benchmark iterations and tolerance for floating point errors.
             */
-            void run(int &argc,
-                     char **argv,
-                     double tol = 1e-6)
+            void run(int argc = 0,
+                     char **argv = nullptr)
             {
                 comppare::internal::helper::parse_args(argc, argv);
                 std::cout << std::left << comppare::internal::ansi::BOLD
@@ -362,9 +377,9 @@ namespace comppare
                           << std::left
                           << std::setw(PRINT_COL_WIDTH) << "Implementation"
                           << std::right
-                          << std::setw(PRINT_COL_WIDTH) << "Func µs"
-                          << std::setw(PRINT_COL_WIDTH) << "ROI µs"
-                          << std::setw(PRINT_COL_WIDTH) << "Ovhd µs";
+                          << std::setw(PRINT_COL_WIDTH) << "Func µs/Iter"
+                          << std::setw(PRINT_COL_WIDTH) << "ROI µs/Iter"
+                          << std::setw(PRINT_COL_WIDTH) << "Ovhd µs/Iter";
 
                 header_row(std::make_index_sequence<NUM_OUT>{});
 
@@ -378,7 +393,7 @@ namespace comppare
 
                     OutTup outs;
 
-                    auto t0 = std::chrono::high_resolution_clock::now();
+                    double func_duration;
                     /*
                     use std::apply to unpack the inputs and outputs completely to do 1 function call of the implementation
                     this is equivalent to calling:
@@ -387,23 +402,29 @@ namespace comppare
                     std::apply([&](auto const &...in)
                                { std::apply(
                                      [&](auto &...out)
-                                     { impl.fn(in..., out...); },
-                                     outs); }, inputs_);
-                    auto t1 = std::chrono::high_resolution_clock::now();
+                                     {
+                                         auto func_start = comppare::config::clock_t::now();
+                                         impl.fn(in..., out...);
+                                         auto func_end = comppare::config::clock_t::now();
+                                         func_duration = std::chrono::duration<double, std::micro>(func_end - func_start).count();
+                                     },
+                                     outs); },
+                               inputs_);
 
                     // Calculate the time taken by the function in microseconds
-                    double roi_us = comppare::config::get_roi_us();
-                    double func_us = std::chrono::duration<double, std::micro>(t1 - t0).count();
+                    double roi_us = comppare::config::get_roi_us() / static_cast<double>(comppare::config::bench_iters());
+                    double func_us = func_duration / static_cast<double>(comppare::config::bench_iters());
                     double ovhd_us = func_us - roi_us;
 
                     PolicyTup errs{};
                     if (k)
                     {
-                        compute_errors(errs, outs, *outputs_[0], tol, std::make_index_sequence<NUM_OUT>{});
+                        compute_errors(errs, outs, *outputs_[0], std::make_index_sequence<NUM_OUT>{});
                     }
                     outputs_.push_back(std::make_shared<OutTup>(std::move(outs)));
                     // print row
-                    std::cout << std::left << std::setw(PRINT_COL_WIDTH) << comppare::internal::ansi::GREEN(impl.name)
+                    std::cout << comppare::internal::ansi::RESET
+                              << std::left << std::setw(PRINT_COL_WIDTH) << comppare::internal::ansi::GREEN(impl.name)
                               << std::fixed << std::setprecision(2) << std::right
                               << comppare::internal::ansi::YELLOW
                               << std::setw(PRINT_COL_WIDTH) << func_us
@@ -412,17 +433,17 @@ namespace comppare
                               << comppare::internal::ansi::YELLOW_OFF;
 
                     print_metrics(errs, std::make_index_sequence<NUM_OUT>{});
-                    if (k && any_fail(errs, tol, std::make_index_sequence<NUM_OUT>{}))
-                        std::cout << comppare::internal::ansi::BG_RED("  <-- FAIL");
+                    if (k && any_fail(errs, std::make_index_sequence<NUM_OUT>{}))
+                        std::cout << comppare::internal::ansi::BG_RED("<-- FAIL");
                     std::cout << '\n';
 
                 } /* for impls */
 
                 comppare::current_state::set_using_plugin(true);
-                for (auto &a : plugins_)
+                if (plugins_)
                 {
-                    a->initialize(argc, argv);
-                    a->run();
+                    plugins_->initialize(argc, argv);
+                    plugins_->run();
                 }
                 comppare::current_state::set_using_plugin(false);
             } /* run */
@@ -472,6 +493,28 @@ namespace comppare
 #define HOTLOOP(LOOP_BODY) \
     HOTLOOPSTART LOOP_BODY HOTLOOPEND
 
+#define MANUAL_TIMER_START \
+    auto t_manual_start = comppare::config::clock_t::now();
+
+#define MANUAL_TIMER_STOP                                  \
+    auto t_manual_stop = comppare::config::clock_t::now(); \
+    SET_ITERATION_TIME(t_manual_stop - t_manual_start);
+
+#ifdef PLUGIN_HOTLOOPEND
+#define SET_ITERATION_TIME(TIME)                  \
+    if (comppare::current_state::using_plugin())  \
+    {                                             \
+        PLUGIN_SET_ITERATION_TIME(TIME);          \
+    }                                             \
+    else                                          \
+    {                                             \
+        comppare::config::increment_roi_us(TIME); \
+    }
+#else
+#define SET_ITERATION_TIME(TIME) \
+    comppare::config::increment_roi_us(TIME);
+#endif
+
 #define GPU_HOTLOOPSTART \
     auto &&hotloop_body = [&]() { /* start of lambda */
 
@@ -498,7 +541,7 @@ namespace comppare
     float ms_;                                                         \
     cudaEventElapsedTime(&ms_, start_, stop_);                         \
     if (comppare::config::get_roi_us() == double(0.0))                 \
-        comppare::config::set_roi_us(1e3 * ms_);                             \
+        comppare::config::set_roi_us(1e3 * ms_);                       \
     cudaEventDestroy(start_);                                          \
     cudaEventDestroy(stop_);
 
@@ -526,41 +569,41 @@ namespace comppare
     float ms_;                                                         \
     hipEventElapsedTime(&ms_, start_, stop_);                          \
     if (comppare::config::get_roi_us() == double(0.0))                 \
-        comppare::config::set_roi_us(1e3 *ms_);                             \
+        comppare::config::set_roi_us(1e3 * ms_);                       \
     hipEventDestroy(start_);                                           \
     hipEventDestroy(stop_);
 
 #endif
 
 #if defined(__CUDACC__)
-#define GPU_START_MANUAL_TIMER                                \
+#define GPU_START_MANUAL_TIMER                         \
     cudaEvent_t start_manual_timer, stop_manual_timer; \
     cudaEventCreate(&start_manual_timer);              \
     cudaEventCreate(&stop_manual_timer);               \
     cudaEventRecord(start_manual_timer);
 
-#define GPU_STOP_MANUAL_TIMER                                                       \
+#define GPU_STOP_MANUAL_TIMER                                                \
     cudaEventRecord(stop_manual_timer);                                      \
     cudaEventSynchronize(stop_manual_timer);                                 \
     float ms_manual;                                                         \
     cudaEventElapsedTime(&ms_manual, start_manual_timer, stop_manual_timer); \
-    comppare::config::increment_roi_us(1e3 * ms_manual);                           \
+    SET_ITERATION_TIME(1e3 * ms_manual);                                     \
     cudaEventDestroy(start_manual_timer);                                    \
     cudaEventDestroy(stop_manual_timer);
 
 #elif defined(__HIPCC__)
-#define GPU_START_MANUAL_TIMER                               \
+#define GPU_START_MANUAL_TIMER                        \
     hipEvent_t start_manual_timer, stop_manual_timer; \
     hipEventCreate(&start_manual_timer);              \
     hipEventCreate(&stop_manual_timer);               \
     hipEventRecord(start_manual_timer);
 
-#define GPU_STOP_MANUAL_TIMER                                                      \
+#define GPU_STOP_MANUAL_TIMER                                               \
     hipEventRecord(stop_manual_timer);                                      \
     hipEventSynchronize(stop_manual_timer);                                 \
     float ms_manual;                                                        \
     hipEventElapsedTime(&ms_manual, start_manual_timer, stop_manual_timer); \
-    comppare::config::increment_roi_us(1e3 * ms_manual);                          \
+    SET_ITERATION_TIME(1e3 * ms_manual);                                    \
     hipEventDestroy(start_manual_timer);                                    \
     hipEventDestroy(stop_manual_timer);
 

@@ -5,6 +5,10 @@
 
 namespace comppare
 {
+    /*
+    Singleton Class for configuration settings
+    Could be global struct -- currently using singleton to ensure.
+    */
     class config
     {
     public:
@@ -23,17 +27,50 @@ namespace comppare
         static void set_bench_iters(uint64_t v) { instance().bench_iters_ = v; }
 
         static void reset_roi_us() { instance().roi_ = double(0.0); }
-        
+
         static void set_roi_us(const time_point_t &start, const time_point_t &end) { instance().roi_ = std::chrono::duration<double, std::micro>(end - start).count(); }
         static void set_roi_us(const float start, const float end) { instance().roi_ = static_cast<double>(end - start); }
         static void set_roi_us(const double start, const double end) { instance().roi_ = end - start; }
+
+        template <typename Rep, typename Period>
+        static void set_roi_us(std::chrono::duration<Rep, Period> v)
+        {
+            double micros = std::chrono::duration<double, std::micro>(v).count();
+            instance().roi_ = micros;
+        }
         static void set_roi_us(const double v) { instance().roi_ = v; }
         static void set_roi_us(const float v) { instance().roi_ = static_cast<double>(v); }
 
+        template <typename Rep, typename Period>
+        static void increment_roi_us(std::chrono::duration<Rep, Period> v)
+        {
+            double micros = std::chrono::duration<double, std::micro>(v).count();
+            instance().roi_ += micros;
+        }
         static void increment_roi_us(const double v) { instance().roi_ += v; }
         static void increment_roi_us(const float v) { instance().roi_ += static_cast<double>(v); }
 
         static double get_roi_us() { return instance().roi_; }
+
+        template <std::floating_point T>
+        static T &fp_tolerance()
+        {
+            static T tol = std::numeric_limits<T>::epsilon() * 1e3; // Default tolerance
+            return tol;
+        }
+
+        template <std::floating_point T>
+        static void set_fp_tolerance(T v)
+        {
+            fp_tolerance<T>() = v;
+        }
+
+        static void set_all_fp_tolerance(long double v)
+        {
+            fp_tolerance<float>() = static_cast<float>(v);
+            fp_tolerance<double>() = static_cast<double>(v);
+            fp_tolerance<long double>() = v;
+        }
 
     private:
         config() = default;
@@ -49,6 +86,9 @@ namespace comppare
         uint64_t bench_iters_{100};
     };
 
+    /*
+    Singleton Class for the current state
+    */
     class current_state
     {
     public:
