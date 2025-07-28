@@ -168,7 +168,7 @@ namespace comppare::plugin::google_benchmark
                       << comppare::internal::ansi::BOLD_OFF << "\n\n";
 
             std::cout << "Google Benchmark cmdline arguments:\n";
-            for (int i = 0; i < (int)bench_argv_.size(); ++i)
+            for (size_t i = 0; i < bench_argv_.size(); ++i)
             {
                 std::cout << std::setw(2) << std::right << " "
                           << "  [" << i << "] " << std::quoted(bench_argv_[i]) << "\n";
