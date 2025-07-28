@@ -21,44 +21,73 @@ ComPPare lets you time and cross‑check any number of host‑side implementatio
 | Header‑only             | Copy headers, or include it, and compile with C++20 or newer. |
 | Any host backend | Accepts any function pointer that runs on the host.               |
 | Detailed timing         | Separates overall call time, your ROI time, and setup/transfer overhead.                   |
-| Built-in error checks | Reports maximum, mean, and total absolute errors.    |
+| Built-in error comparison | For common data types, automatically choose the correct method and compares against reference function    |
 
+## Install
+### 1. Clone repository
+```bash
+git clone git@github.com:funglf/ComPPare.git --recursive
+```
+#### If submodules like google benchmark/ nvbench is not needed:
+```bash
+git clone git@github.com:funglf/ComPPare.git
+```
+
+### 2. (Optional) Build Google Benchmark
+See [Google Benchmark Instructions](benchmark/README.md) 
+
+### 3. Include ComPPare
+In your C++ code, simply include the comppare header file by:
+```c
+#include <comppare/comppare.hpp>
+```
 
 ---
 
 ## Quick Start
 
 ### 1. Adopt the required function signature
-
+*Function output must be `void`*
+and consists of the input, then output types
 ```cpp
 void impl(const Inputs&... in,     // read‑only inputs
         Outputs&...      out);     // outputs compared to reference
+```
+
+In order to benchmark specific regions of code, following Macros `HOTLOOPSTART`, `HOTLOOPEND` are needed:
+```cpp
+void impl(const Inputs&... in,
+        Outputs&...      out);
 {
-    // setup (memory allocation, data transfer, etc.)
+    /* 
+    setup or overhead you DO NOT want to benchmark 
+    -- memory allocation, data transfer, etc.
+    */
 
-    HOTLOOPSTART;
+    HOTLOOPSTART; // Macro of start of Benchmarking Region of Interest
+
     // ... perform core computation here ...
-    HOTLOOPEND;
 
+    HOTLOOPEND;   // Macro of end of Benchmarking Region of Interest
 }
 ```
 
 
 #### SAXPY function example signatures
 ```cpp
-void saxpy_cpu(/*Input pack*/
+void saxpy_cpu(/*Input types*/
             float a,
             const std::vector<float> &x,
             const std::vector<float> &y_in,
-            /*Output pack*/
+            /*Output types*/
             std::vector<float> &y_out)
 
 // Comparing with another function with the exact same signature
-void saxpy_gpu(/*Input pack*/
+void saxpy_gpu(/*Input types*/
             float a,
             const std::vector<float> &x,
             const std::vector<float> &y_in,
-            /*Output pack*/
+            /*Output types*/
             std::vector<float> &y_out)
 ```
 
@@ -72,13 +101,13 @@ using Cmp =
     comppare::
         /*Define Input Pack Types same as the function*/
         InputContext<
-            float, 
-            std::vector<float>, 
-            std::vector<float>
+            float,  /*float a*/
+            std::vector<float>, /*std::vector<float> x*/
+            std::vector<float>  /*std::vector<float> y*/
             >::
                 /*Define Output Pack types same as the function*/
                 OutputContext<
-                std::vector<float>
+                std::vector<float>  /*std::vector<float> y_out*/
                 >;
 ```
 
@@ -93,24 +122,32 @@ Cmp cmp(a, x, y);   // a: float, x: input vector x, y: input vector y
 ### 3. Register implementations
 
 ```cpp
-cmp.set_reference("CPU serial", cpu_std);  // setting reference
-cmp.add("CPU OpenMP",  cpu_omp);           // any number of additional functions
+cmp.set_reference("cpu serial", saxpy_cpu);  // setting reference
+cmp.add("gpu kernel",  saxpy_gpu);           // any number of additional functions
 ```
 
 ### 4. Run and inspect
 
 ```cpp
-cmp.run(argc, argv, tol);
+cmp.run(argc, argv);
 ```
 
 #### Sample report:
 
-```
-Name           Func µs   ROI µs   Ovhd µs  Max|err|[0]
-CPU serial     1.34e+5   …        …        0.00e+00
-CPU OpenMP     2.96e+4   …        …        0.00e+00 
-```
+```bash
+*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
+============ ComPPare Framework ============
+=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
 
+Number of implementations:             3
+Warmup iterations:                   100
+Benchmark iterations:                100
+=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
+
+Implementation                  Func µs             ROI µs            Ovhd µs         Max|err|[0]        Mean|err|[0]       Total|err|[0]
+cpu serial                         38.01               15.97               22.05            0.00e+00            0.00e+00            0.00e+00
+gpu kernel                      73151.41                1.07            73150.34            3.30e+06            1.66e+06            1.70e+09  <-- FAIL
+```
 ### Complete example with SAXPY
 [(See SAXPY Full Example)](examples/saxpy/README.md)
 
