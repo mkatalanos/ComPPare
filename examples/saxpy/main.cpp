@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 #endif
 
     // Run the comparison with specified iterations and tolerance
-    compare.run(argc, argv, cfg.tol);
+    compare.run(argc, argv);
 
     return 0;
 }
