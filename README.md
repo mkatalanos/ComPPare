@@ -185,11 +185,7 @@ int main(int argc, char **argv)
     std::vector<float> x(1000, 2.2); // Vector of size 1000 filled with 2.2
     std::vector<float> y(1000, 3.3); // Vector of size 1000 filled with 3.3
 
-    // Define the input and output types for the comparison framework instance
-    using ScalarType = float;
-    using VectorType = std::vector<float>;
-
-    using cmp = 
+    using Cmp = 
     comppare::
         /*Define Input Pack Types same as the function*/
             InputContext<float, 
@@ -203,15 +199,15 @@ int main(int argc, char **argv)
     x -- std::vector<float>
     y -- std::vector<float>
     */
-    cmp compare(cfg.a, cfg.x, cfg.y);
+    Cmp cmp(a, x, y); // cmp is the instance
 
     // Set reference implementation
-    compare.set_reference("cpu serial", /*Function*/ saxpy_cpu);
+    cmp.set_reference("cpu serial", /*Function*/ saxpy_cpu);
     // Add implementations to compare
-    compare.add("gpu kernel", /*Function*/ saxpy_gpu);
+    cmp.add("gpu kernel", /*Function*/ saxpy_gpu);
 
     // Run the comparison with specified iterations and tolerance
-    compare.run(argc, argv);
+    cmp.run(argc, argv);
 
     return 0;
 }
