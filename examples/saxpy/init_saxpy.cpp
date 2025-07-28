@@ -23,14 +23,6 @@ SaxpyConfig init_saxpy(int argc, char **argv)
         {
             cfg.a = std::stof(argv[++i]);
         }
-        else if (key == "--tol" && i + 1 < argc)
-        {
-            cfg.tol = std::stod(argv[++i]);
-        }
-        else
-        {
-            throw std::invalid_argument("Unknown argument: " + std::string(key));
-        }
     }
 
     // Randomize scalar if not provided
@@ -53,7 +45,7 @@ SaxpyConfig init_saxpy(int argc, char **argv)
     }
 
     // Print config
-    std::cout << "\n=== SAXPY Benchmark Parameters ===\n";
+    std::cout << "=== SAXPY Benchmark Parameters ===\n";
     std::cout << "Vector size (N)     : " << cfg.N << '\n';
     std::cout << "Scalar a            : " << cfg.a << '\n';
     std::cout << "===================================\n\n";
