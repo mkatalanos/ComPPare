@@ -83,7 +83,7 @@ void saxpy_cpu(/*Input types*/
             std::vector<float> &y_out)
 
 // Comparing with another function with the exact same signature
-void cf(/*Input types*/
+void saxpy_gpu(/*Input types*/
             float a,
             const std::vector<float> &x,
             const std::vector<float> &y_in,
