@@ -1,6 +1,3 @@
-examples/saxpy/build/
-example/max_reduction/build
-examples/dummy/
-examples/saxpy_googlebench/
+**/build/
 .vscode/
 .DS_Store
