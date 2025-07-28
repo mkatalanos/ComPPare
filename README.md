@@ -83,7 +83,7 @@ void saxpy_cpu(/*Input types*/
             std::vector<float> &y_out)
 
 // Comparing with another function with the exact same signature
-void saxpy_gpu(/*Input types*/
+void cf(/*Input types*/
             float a,
             const std::vector<float> &x,
             const std::vector<float> &y_in,
@@ -153,7 +153,6 @@ gpu kernel                      73151.41                1.07            73150.34
 
 ```cpp
 #include <vector>
-#include <omp.h>
 
 #include <comppare/comppare.hpp>
 
@@ -177,13 +176,14 @@ void saxpy_cpu(/*Input pack*/
 }
 
 // OpenMP variant
-void saxpy_cpu_omp(/* same signature */){...};
+void saxpy_gpu(/* same signature */){...};
 
 
 int main(int argc, char **argv)
 {
-    // Initialize SAXPY configuration
-    SaxpyConfig cfg = init_saxpy(argc, argv);
+    float a = 1.1f;
+    std::vector<float> x(1000, 2.2); // Vector of size 1000 filled with 2.2
+    std::vector<float> y(1000, 3.3); // Vector of size 1000 filled with 3.3
 
     // Define the input and output types for the comparison framework instance
     using ScalarType = float;
@@ -208,10 +208,10 @@ int main(int argc, char **argv)
     // Set reference implementation
     compare.set_reference("cpu serial", /*Function*/ saxpy_cpu);
     // Add implementations to compare
-    compare.add("cpu parallel", /*Function*/ saxpy_cpu_omp);
+    compare.add("gpu kernel", /*Function*/ saxpy_gpu);
 
     // Run the comparison with specified iterations and tolerance
-    compare.run(argc, argv, cfg.tol);
+    compare.run(argc, argv);
 
     return 0;
 }
