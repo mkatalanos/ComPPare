@@ -34,7 +34,7 @@ git clone git@github.com:funglf/ComPPare.git
 ```
 
 ### 2. (Optional) Build Google Benchmark
-See [Google Benchmark Instructions](benchmark/README.md) 
+See [Google Benchmark Instructions](https://github.com/google/benchmark/blob/b20cea674170b2ba45da0dfaf03953cdea473d0d/README.md) 
 
 ### 3. Include ComPPare
 In your C++ code, simply include the comppare header file by:
