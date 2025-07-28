@@ -1,5 +1,5 @@
 #pragma once
-// #ifdef HAVE_GOOGLE_BENCHMARK
+#ifdef HAVE_GOOGLE_BENCHMARK
 #include <utility>
 #include <tuple>
 #include <ostream>
@@ -13,6 +13,7 @@
 #include <benchmark/benchmark.h>
 
 #include "comppare/plugin/plugin.hpp"
+#include "comppare/internal/ansi.hpp"
 
 namespace comppare::plugin::google_benchmark
 {
@@ -135,20 +136,24 @@ namespace comppare::plugin::google_benchmark
 
         void print_benchmark_header()
         {
-            std::cout << "\n"
-                      << "============================================================\n"
-                      << std::setw(2) << std::right << ">>>"
-                      << " Google Benchmark\n"
-                      << std::setw(2) << std::right << ">>>"
-                      << " Args:\n";
 
+            std::cout << "\n"
+                      << std::left << comppare::internal::ansi::BOLD
+                      << "*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=\n============= "
+                      << comppare::internal::ansi::ITALIC("Google Benchmark")
+                      << " =============\n=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*"
+                      << comppare::internal::ansi::BOLD_OFF << "\n\n";
+
+            std::cout << "Google Benchmark cmdline arguments:\n";
             for (int i = 0; i < (int)bench_argv_.size(); ++i)
             {
                 std::cout << std::setw(2) << std::right << " "
                           << "  [" << i << "] " << std::quoted(bench_argv_[i]) << "\n";
             }
 
-            std::cout << "============================================================\n";
+            std::cout << std::left
+                      << comppare::internal::ansi::BOLD("=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*")
+                      << "\n\n";
         }
     };
 
@@ -195,6 +200,23 @@ namespace comppare::plugin::google_benchmark
         GoogleBenchmarkPlugin() = default;
     };
 
+    template <comppare::internal::concepts::FloatingPoint T>
+    inline void SetIterationTime(T time)
+    {
+        benchmark::State &st = comppare::plugin::google_benchmark::state::get_state();
+        st.SetIterationTime(static_cast<double>(time * 1e-6));
+    }
+
+    template <typename Rep, typename Period>
+    inline void SetIterationTime(std::chrono::duration<Rep, Period> time)
+    {
+        benchmark::State &st = comppare::plugin::google_benchmark::state::get_state();
+        double elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(time).count();
+        st.SetIterationTime(elapsed_seconds);
+    }
+
+}
+
 #define PLUGIN_HOTLOOPEND                                                          \
     benchmark::State &st = comppare::plugin::google_benchmark::state::get_state(); \
     for (auto _ : st)                                                              \
@@ -202,6 +224,7 @@ namespace comppare::plugin::google_benchmark
         hotloop_body();                                                            \
     }
 
-}
+#define PLUGIN_SET_ITERATION_TIME(TIME) \
+    comppare::plugin::google_benchmark::SetIterationTime(TIME);
 
-// #endif // HAVE_GOOGLE_BENCHMARK
+#endif // HAVE_GOOGLE_BENCHMARK
