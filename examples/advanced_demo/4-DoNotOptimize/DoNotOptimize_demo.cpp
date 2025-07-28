@@ -42,11 +42,11 @@ int main(int argc, char **argv)
                 compare(a, x, y);
 
 #ifdef HAVE_GOOGLE_BENCHMARK
-    compare.set_reference("Normal", SAXPY).google_benchmark();
-    compare.add("DoNotOptimize", SAXPY_DONOTOPTIMIZE).google_benchmark();
+    compare.set_reference("SAXPY", SAXPY).google_benchmark();
+    compare.add("SAXPY_DONOTOPTIMIZE", SAXPY_DONOTOPTIMIZE).google_benchmark();
 #else
-    compare.set_reference("Normal", SAXPY);
-    compare.add("DoNotOptimize", SAXPY_DONOTOPTIMIZE);
+    compare.set_reference("SAXPY", SAXPY);
+    compare.add("SAXPY_DONOTOPTIMIZE", SAXPY_DONOTOPTIMIZE);
 #endif
 
     compare.run(argc, argv);
