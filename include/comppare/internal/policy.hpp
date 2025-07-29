@@ -188,7 +188,7 @@ namespace comppare::internal::policy
                 return MetricValue<T>(error_, is_fail(), valid_, err_msg_);
             }
 
-            bool is_fail() const { return valid_ || error_ > comppare::config::fp_tolerance<T>(); }
+            bool is_fail() const { return !valid_ || error_ > comppare::config::fp_tolerance<T>(); }
 
             void compute_error(const T &a, const T &b)
             {
