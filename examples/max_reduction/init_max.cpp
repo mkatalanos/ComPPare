@@ -23,14 +23,6 @@ MaxConfig init_max(int argc, char **argv)
         {
             cfg.N = 1ULL << std::stoull(argv[++i]);
         }
-        else if (key == "--tol" && i + 1 < argc)
-        {
-            cfg.tol = std::stod(argv[++i]);
-        }
-        else
-        {
-            throw std::invalid_argument("Unknown argument: " + std::string(key));
-        }
     }
 
     float *data;
