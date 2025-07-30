@@ -57,20 +57,43 @@ private:
     bool same_brand_{true};
 
 public:
+    /* Rule 1: metric_count() function to return the number of metrics */
     static constexpr std::size_t metric_count() { return 1; }
-    static constexpr std::string_view metric_name(std::size_t) { return "SameBrand?"; }
 
+    /* Rule 2: metric_name(std::size_t i) function to return the name of the metric at index i */
+    static std::string_view metric_name(std::size_t i)
+    {
+        if (i == 0)
+            return "SameBrand?";
+
+        throw std::out_of_range("Invalid metric index");
+    }
+
+    /* Rule 3: compute_error(const T&&a, const T&&b) function to compute the error metrics */
     void compute_error(const car &a, const car &b)
     {
         same_brand_ = (a.make == b.make);
     }
 
+    /* Rule 4: is_fail() function to return true if the implementation did not pass */
     bool is_fail() const
     {
         return !same_brand_;
     }
+
+
 #define USE_METRIC_VALUE
-#ifdef USE_METRIC_VALUE
+#ifndef USE_METRIC_VALUE
+    /* Rule 5 -- option 1: metric(std::size_t) function to return the value of the metric */
+    std::string metric(std::size_t i) const
+    {
+        if (i == 0)
+        {
+            return same_brand_ ? "true" : "false";
+        }
+    }
+#else
+    /* Rule 5 -- option 2: metric(std::size_t) function to return the value of the metric within Wrapper class for aesthetics purpose*/
     comppare::internal::policy::MetricValue<std::string> metric(std::size_t i) const
     {
         if (i == 0)
@@ -78,14 +101,6 @@ public:
             return comppare::internal::policy::MetricValue<std::string>(same_brand_ ? "true" : "false", is_fail());
         }
         throw std::out_of_range("Invalid metric index");
-    }
-#else
-    std::string metric(std::size_t i) const
-    {
-        if (i == 0)
-        {
-            return same_brand_ ? "true" : "false";
-        }
     }
 #endif
 };

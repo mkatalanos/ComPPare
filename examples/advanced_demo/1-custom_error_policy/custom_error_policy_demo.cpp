@@ -38,7 +38,7 @@ void car3(car &c)
     HOTLOOPEND;
 }
 
-int main()
+int main(int argc, char **argv)
 {
     comppare::
         InputContext<>::
@@ -49,5 +49,5 @@ int main()
     compare.add("Toyota Corolla", car2);
     compare.add("Porsche 911", car3);
 
-    compare.run();
+    compare.run(argc, argv);
 }
