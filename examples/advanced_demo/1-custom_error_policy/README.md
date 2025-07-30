@@ -1,6 +1,16 @@
 # Advanced Demo 1 — **Custom Error Policy** <!-- omit from toc -->
+- [1. Introduction](#1-introduction)
+- [2. Quick Start](#2-quick-start)
+  - [2.1. Build](#21-build)
+  - [2.2. Run](#22-run)
+  - [2.3. Results](#23-results)
+- [3. Example Case](#3-example-case)
+  - [3.1. Custom Data Structure -- `data_structure.hpp`](#31-custom-data-structure----data_structurehpp)
+  - [3.2. Error Policy: Same Make/Brand? -- `custom_policy.hpp`](#32-error-policy-same-makebrand----custom_policyhpp)
+- [4. Error Policy Rules](#4-error-policy-rules)
+  - [4.1. Summary of ErrorPolicy Required Funcions](#41-summary-of-errorpolicy-required-funcions)
 
-## Introduction 
+## 1. Introduction 
 This example is used to demonstrate how to make your own Error Policy -- your custom method for comparing outputs of your functions.
 At the time of writing, comppare provides error testing ONLY for types:
 
@@ -11,19 +21,19 @@ At the time of writing, comppare provides error testing ONLY for types:
 
 Any other types, or custom types require their own Error Policy to compare.
 
-## Quick Start
-### Build
+## 2. Quick Start
+### 2.1. Build
 ```bash
 mkdir build 
 cd build 
 cmake .. 
 make 
 ```
-### Run
+### 2.2. Run
 ```bash
 ./custom_error_policy_demo
 ```
-### Results
+### 2.3. Results
 ```bash
 *=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 ============ ComPPare Framework ============
@@ -41,10 +51,10 @@ Porsche 911                         0.04                0.02                0.02
 ```
 
 
-## Example Case
+## 3. Example Case
 This example is found in code.
 
-### Custom Data Structure -- `data_structure.hpp`
+### 3.1. Custom Data Structure -- `data_structure.hpp`
 Here we have a custom struct called `car` which stores the following information:
 ```cpp
 struct car
@@ -56,7 +66,7 @@ struct car
 };
 ```
 
-### Error Policy: Same Make/Brand? -- `custom_policy.hpp`
+### 3.2. Error Policy: Same Make/Brand? -- `custom_policy.hpp`
 We want to compare different functions whether they write out the `same make/brand`
 for instance, function `car1` writes the make/brand as "Toyota"
 ```cpp
@@ -81,12 +91,12 @@ void car2(car &c)
 
 Therefore, based on this comparison criteria, `car2()` is the same implementation as `car1()`
 
-## Error Policy Rules
+## 4. Error Policy Rules
 With this [Example](#example-case) in mind, we can start writing the custom Error Policy `IsSameBrand`
 
 To be a valid Error Policy, there are a couple rules to follow:
 
-### 1. How many Metrics -- `metric_count()`
+### 1. How many Metrics -- `metric_count()` <!-- omit from toc -->
 For our case, we only need a `single metric`: is it the `Same Brand?`
 
 Therefore, our first function `metric_count()` would simply return 1
@@ -98,7 +108,7 @@ static constexpr std::size_t metric_count() { return 1; }
 > Note: Some types can have a few metrics. For instance, std::vector&lt;double&gt; can be 3 criteria: Total Error, Mean Error, Max Error. 
 
 
-### 2. What is the Name of the metric(s)?
+### 2. What is the Name of the metric(s)? <!-- omit from toc -->
 We only have 1 metric on whether is it the same make, lets name it `SameBrand?`
 This is used to print the column name. So any human readable, easily understood name would be perfect!
 
@@ -113,7 +123,7 @@ static std::string_view metric_name(std::size_t i)
 }
 ```
 
-### 3. Way to compute the Error
+### 3. Way to compute the Error <!-- omit from toc -->
 To compute the error, we need to provide a reference object against a object you want to test 
 
 ```cpp
@@ -123,7 +133,7 @@ void compute_error(const car &a, const car &b)
 }
 ```
 
-### 4. Did it pass?
+### 4. Did it pass? <!-- omit from toc -->
 ```cpp
 bool is_fail() const
 {
@@ -131,7 +141,7 @@ bool is_fail() const
 }
 ```
 
-### 5. Print out the results 
+### 5. Print out the results <!-- omit from toc -->
 
 #### Option 1: Returning a String <!-- omit from toc -->
 
@@ -184,24 +194,24 @@ comppare::internal::policy::MetricValue<std::vector<float>> // Invalid -- std::v
 ```
 
 
-### Summary of ErrorPolicy Required Funcions
-#### 1. `static size_t metric_count()`
+### 4.1. Summary of ErrorPolicy Required Funcions
+#### 1. `static size_t metric_count()` <!-- omit from toc -->
 Returns the number of metrics 
 
-#### 2. `static std::string_view metric_name(std::size_t i)`
+#### 2. `static std::string_view metric_name(std::size_t i)` <!-- omit from toc -->
 Returns the Name of Metric based on input index `i`, for `i < metric_count()`.
 
-#### 3. `void compute_error(const T&&a, const T&&b)`
+#### 3. `void compute_error(const T&&a, const T&&b)` <!-- omit from toc -->
 Void function requiring input of 2 objects to compute the error metrics
 
-#### 4. `bool is_fail()`
+#### 4. `bool is_fail()` <!-- omit from toc -->
 Returns whether the case has failed or not.
 
-#### 5 -- option 1 `T metric(size_t i) const`
+#### 5 -- option 1 `T metric(size_t i) const` <!-- omit from toc -->
 **T must be either a Numerical Value or std::string**
 Returns the Value of Metric based on input index `i`, for `i < metric_count()`.
 
-#### 5 -- option 2 `comppare::internal::policy::MetricValue<T> metric(size_t i) const`
+#### 5 -- option 2 `comppare::internal::policy::MetricValue<T> metric(size_t i) const` <!-- omit from toc -->
 **T must be able to print to out stream**
 In other words:
 ```cpp
