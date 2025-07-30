@@ -8,7 +8,7 @@
   - [3.1. Custom Data Structure -- `data_structure.hpp`](#31-custom-data-structure----data_structurehpp)
   - [3.2. Error Policy: Same Make/Brand? -- `custom_policy.hpp`](#32-error-policy-same-makebrand----custom_policyhpp)
 - [4. Error Policy Rules](#4-error-policy-rules)
-  - [4.1. Summary of ErrorPolicy Required Funcions](#41-summary-of-errorpolicy-required-funcions)
+- [4.1. ErrorPolicy's Rule of 5 -- Summary](#41-errorpolicys-rule-of-5----summary)
 
 ## 1. Introduction 
 This example is used to demonstrate how to make your own Error Policy -- your custom method for comparing outputs of your functions.
@@ -134,6 +134,7 @@ void compute_error(const car &a, const car &b)
 ```
 
 ### 4. Did it pass? <!-- omit from toc -->
+A function that returns whether this current implementation had passed or not. It can be any logic you want to be, based on the calculated metrics.
 ```cpp
 bool is_fail() const
 {
@@ -144,7 +145,7 @@ bool is_fail() const
 ### 5. Print out the results <!-- omit from toc -->
 
 #### Option 1: Returning a String <!-- omit from toc -->
-
+The most straightforward way to return a value. The returned value can be any numerical (scalar) value too.
 ```cpp
 std::string metric(std::size_t i) const
 {
@@ -154,11 +155,6 @@ std::string metric(std::size_t i) const
     }
 }
 ```
-
-> Note: You can return a numerical value too.
-
-
-
 #### Option 2: Returning a Wrapper class of a "Streamable" type <!-- omit from toc -->
 
 The only advantage to use the wrapper to return is for colouring of the results. The values are coloured red if it fails.
@@ -194,25 +190,26 @@ comppare::internal::policy::MetricValue<std::vector<float>> // Invalid -- std::v
 ```
 
 
-### 4.1. Summary of ErrorPolicy Required Funcions
-#### 1. `static size_t metric_count()` <!-- omit from toc -->
+## 4.1. ErrorPolicy's Rule of 5 -- Summary
+
+### 1. `static size_t metric_count()` <!-- omit from toc -->
 Returns the number of metrics 
 
-#### 2. `static std::string_view metric_name(std::size_t i)` <!-- omit from toc -->
+### 2. `static std::string_view metric_name(std::size_t i)` <!-- omit from toc -->
 Returns the Name of Metric based on input index `i`, for `i < metric_count()`.
 
-#### 3. `void compute_error(const T&&a, const T&&b)` <!-- omit from toc -->
+### 3. `void compute_error(const T&&a, const T&&b)` <!-- omit from toc -->
 Void function requiring input of 2 objects to compute the error metrics
 
-#### 4. `bool is_fail()` <!-- omit from toc -->
+### 4. `bool is_fail()` <!-- omit from toc -->
 Returns whether the case has failed or not.
 
-#### 5 -- option 1 `T metric(size_t i) const` <!-- omit from toc -->
+### 5 -- option 1 `T metric(size_t i) const` <!-- omit from toc -->
 **T must be either a Numerical Value or std::string**
 Returns the Value of Metric based on input index `i`, for `i < metric_count()`.
 
-#### 5 -- option 2 `comppare::internal::policy::MetricValue<T> metric(size_t i) const` <!-- omit from toc -->
-**T must be able to print to out stream**
+### 5 -- option 2 `comppare::internal::policy::MetricValue<T> metric(size_t i) const` <!-- omit from toc -->
+again, **T must be able to print to out stream**
 In other words:
 ```cpp
 T a;
@@ -220,3 +217,7 @@ std::cout << a; // if valid
 comppare::internal::policy::MetricValue<T> // then this is valid 
 ```
 
+### Summary of Summary <!-- omit from toc -->
+If your ErrorPolicy fulfils these 5 functions, your code should be able to compile. Or else, compile time restraints will not allow this to compile.
+
+> Rule of Five is actually a C++ Convention/Rule on how to write classes. Hope this C++ intended pun did not confuse you. [(See Rule of Five in Cppreference)](https://en.cppreference.com/w/cpp/language/rule_of_three.html)
