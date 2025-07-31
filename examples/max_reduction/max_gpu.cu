@@ -1,5 +1,5 @@
 #ifdef HAVE_CUDA
-#include "common.hpp"
+
 #include "max_gpu.cuh"
 #include <span>
 #include <comppare/comppare.hpp>

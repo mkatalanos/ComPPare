@@ -1,7 +1,10 @@
 #ifdef HAVE_CUDA
 #pragma once
 #include <span>
-#include "common.hpp"
+
+#ifndef BLOCKSIZE
+#define BLOCKSIZE 1024
+#endif
 
 __global__ void max_kernel(const int thread_max,
                            float *__restrict__ max_output,

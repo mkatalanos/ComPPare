@@ -6,8 +6,10 @@
 #include <random>
 #include <span>
 
-#include "common.hpp"
 #include "init_max.hpp"
+#ifdef HAVE_CUDA
+#include <cuda_runtime.h>
+#endif
 
 
 MaxConfig init_max(int argc, char **argv)

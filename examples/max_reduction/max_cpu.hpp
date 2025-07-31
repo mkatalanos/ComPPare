@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common.hpp"
 #include <span>
 
 void cpu_max_serial(std::span<const float> in,

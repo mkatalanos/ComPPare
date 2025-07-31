@@ -3,7 +3,10 @@
 #include <vector>
 #include <cmath>
 #include <span>
-#include "common.hpp"
+
+#ifdef HAVE_CUDA
+#include <cuda_runtime.h>
+#endif
 
 struct MaxConfig
 {

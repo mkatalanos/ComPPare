@@ -1,6 +1,6 @@
 #include "max_cpu.hpp"
 #include "init_max.hpp"
-#include "common.hpp"
+
 #ifdef HAVE_CUDA
 #include "max_gpu.cuh"
 #endif
