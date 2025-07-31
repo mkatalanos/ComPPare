@@ -184,7 +184,7 @@ void gpu_max(std::span<const float> in,
 
     int array_size = in.size();
 
-    GPU_START_MANUAL_TIMER;
+    GPU_MANUAL_TIMER_START;
     /*
     Each kernel reduces the input array per block and writes the maximum value into the output array.
     The output array is then reduced again in the next iteration until only one value remains.
@@ -201,7 +201,7 @@ void gpu_max(std::span<const float> in,
     }
     // Final swap to ensure the final result is in d_output
     std::swap(d_input, d_output);
-    GPU_STOP_MANUAL_TIMER;
+    GPU_MANUAL_TIMER_STOP;
     GPU_HOTLOOPEND;
 
     cudaMemcpy(&out, d_output, sizeof(float), cudaMemcpyDeviceToHost);
