@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
 
 set(PROJECT_NAME "max_reduction")
 
@@ -81,6 +81,17 @@ set(CMAKE_CUDA_FLAGS_RELEASE "-O3")
 
 find_package(CUDAToolkit REQUIRED)
 
+# final executable
+add_executable(${PROJECT_NAME} ${CPP_SOURCES} ${CUDA_SOURCES})
+target_link_libraries(${PROJECT_NAME}
+  PRIVATE
+  CUDA::cudart
+  ${CMAKE_THREAD_LIBS_INIT}
+  OpenMP::OpenMP_CXX
+  stdc++
+  m
+)
+
 # Detect CUDA architectures supported by nvcc 
 execute_process(
   COMMAND ${CMAKE_CUDA_COMPILER} --list-gpu-arch
@@ -94,27 +105,31 @@ foreach(sm ${sm_list})
   list(APPEND arch_list ${num})
 endforeach()
 list(REMOVE_DUPLICATES arch_list)
-message(STATUS "Auto-detected CUDA ARCHS: sm_${arch_list}")
+message(STATUS "Cuda Architectures supported by compiler: sm_${arch_list}")
 
 # Verify if user defined CUDA_ARCH is valid for compiler
 if (CUDA_ARCH)
-  if ("${CUDA_ARCH}" IN_LIST arch_list)
-    message(STATUS "Using user-specified CUDA ARCH: sm_${CUDA_ARCH}-real")
-    set(arch_list "${CUDA_ARCH}-real")
-    # set the CUDA architectures for the project
-    set(CMAKE_CUDA_ARCHITECTURES ${arch_list} CACHE STRING "" FORCE)
-  endif()
-else()
-  message(STATUS "Using Default CUDA ARCH: ${CMAKE_CUDA_ARCHITECTURES}")
-endif()
 
-# final executable
-add_executable(${PROJECT_NAME} ${CPP_SOURCES} ${CUDA_SOURCES})
-target_link_libraries(${PROJECT_NAME}
-  PRIVATE
-  CUDA::cudart
-  ${CMAKE_THREAD_LIBS_INIT}
-  OpenMP::OpenMP_CXX
-  stdc++
-  m
-)
+    set(_real_archs)
+
+    foreach(a IN LISTS CUDA_ARCH)
+      if (NOT "${a}" IN_LIST arch_list)
+        message(FATAL_ERROR "Invalid CUDA_ARCH specified: ${CUDA_ARCH}. Valid options are: ${arch_list}")
+      endif()
+      list(APPEND _real_archs "${a}-real")
+    endforeach()
+
+    set_target_properties(
+      ${PROJECT_NAME} PROPERTIES
+      CUDA_ARCHITECTURES "${_real_archs}"
+    )
+
+else()
+
+    message(STATUS "No CUDA_ARCH specified, compiling for all architectures supported by the compiler")
+    set_target_properties(
+      ${PROJECT_NAME} PROPERTIES
+      CUDA_ARCHITECTURES all
+    )
+
+endif()

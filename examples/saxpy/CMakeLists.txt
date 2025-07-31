@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
 
 set(PROJECT_NAME "saxpy")
 
@@ -78,33 +78,6 @@ set(CMAKE_CUDA_FLAGS_RELEASE        "-O3")
 
 find_package(CUDAToolkit REQUIRED)
 
-# Detect CUDA architectures supported by nvcc 
-execute_process(
-  COMMAND ${CMAKE_CUDA_COMPILER} --list-gpu-arch
-  OUTPUT_VARIABLE raw_archs
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-string(REGEX MATCHALL "compute_([0-9]+)" sm_list ${raw_archs})
-set(arch_list "")
-foreach(sm ${sm_list})
-  string(REGEX REPLACE "compute_" "" num ${sm})
-  list(APPEND arch_list ${num})
-endforeach()
-list(REMOVE_DUPLICATES arch_list)
-message(STATUS "Auto-detected CUDA ARCHS: sm_${arch_list}")
-
-# Verify if user defined CUDA_ARCH is valid for compiler
-if (CUDA_ARCH)
-  if ("${CUDA_ARCH}" IN_LIST arch_list)
-    message(STATUS "Using user-specified CUDA ARCH: sm_${CUDA_ARCH}-real")
-    set(arch_list "${CUDA_ARCH}-real")
-    # set the CUDA architectures for the project
-    set(CMAKE_CUDA_ARCHITECTURES ${arch_list} CACHE STRING "" FORCE)
-  endif()
-else()
-  message(STATUS "Using Default CUDA ARCH: ${CMAKE_CUDA_ARCHITECTURES}")
-endif()
-
 
 # link CUDA sources into shared library (not sure why but double free error when static linking)
 add_library(saxpy_cuda SHARED ${CUDA_SOURCES})
@@ -127,3 +100,55 @@ target_link_libraries(${PROJECT_NAME}
                       stdc++
                       m
 )
+
+# Detect CUDA architectures supported by nvcc 
+execute_process(
+  COMMAND ${CMAKE_CUDA_COMPILER} --list-gpu-arch
+  OUTPUT_VARIABLE raw_archs
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+string(REGEX MATCHALL "compute_([0-9]+)" sm_list ${raw_archs})
+set(arch_list "")
+foreach(sm ${sm_list})
+  string(REGEX REPLACE "compute_" "" num ${sm})
+  list(APPEND arch_list ${num})
+endforeach()
+list(REMOVE_DUPLICATES arch_list)
+message(STATUS "Cuda Architectures supported by compiler: sm_${arch_list}")
+
+# Verify if user defined CUDA_ARCH is valid for compiler
+if (CUDA_ARCH)
+
+    set(_real_archs)
+
+    foreach(a IN LISTS CUDA_ARCH)
+      if (NOT "${a}" IN_LIST arch_list)
+        message(FATAL_ERROR "Invalid CUDA_ARCH specified: ${CUDA_ARCH}. Valid options are: ${arch_list}")
+      endif()
+      list(APPEND _real_archs "${a}-real")
+    endforeach()
+
+    set_target_properties(
+      saxpy_cuda PROPERTIES
+      CUDA_ARCHITECTURES "${_real_archs}"
+    )
+
+    set_target_properties(
+      ${PROJECT_NAME} PROPERTIES
+      CUDA_ARCHITECTURES "${_real_archs}"
+    )
+
+else()
+
+    message(STATUS "No CUDA_ARCH specified, compiling for all architectures supported by the compiler")
+    set_target_properties(
+      saxpy_cuda PROPERTIES
+      CUDA_ARCHITECTURES all
+    )
+
+    set_target_properties(
+      ${PROJECT_NAME} PROPERTIES
+      CUDA_ARCHITECTURES all
+    )
+
+endif()
