@@ -1,4 +1,4 @@
-# 1. Max Reduction Benchmark with ComPPare Framework <!-- omit from toc -->
+# Max Reduction Benchmark with ComPPare Framework <!-- omit from toc -->
 Finds the maximum value within an array/vector.
 
 - [1. Build Instructions](#1-build-instructions)
@@ -78,13 +78,13 @@ The executable takes the following command-line arguments:
 
 | Flag      | Description                        | Default         |
 | --------- | ---------------------------------- | --------------- |
-| `--size`      | log2 of vector size (`N = 2^n`)    | 26              |
+| `--size`      | log2 of vector size (`N = 2^n`)    | 18              |
 
 
 ### 1.2.2. Example <!-- omit from toc -->
 
 ```bash
-./max_reduction --size 18
+./max_reduction --size 26
 ```
 
 
@@ -101,7 +101,7 @@ Output will print:
 
 ```bash
 === Max Reduction Benchmark Parameters ===
-Vector size (N)     : 262144
+Vector size (N)     : 67108864
 ===================================
 
 *=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
