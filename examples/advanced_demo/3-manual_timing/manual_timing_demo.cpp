@@ -46,7 +46,7 @@ static void bench_resize(std::vector<int> &v)
 
     MANUAL_TIMER_START;
     v.resize(N);
-    MANUAL_TIMER_STOP;
+    MANUAL_TIMER_END;
 
     random_fill(v);
 
@@ -63,7 +63,7 @@ static void bench_randomfill(std::vector<int> &v)
 
     MANUAL_TIMER_START;
     random_fill(v);
-    MANUAL_TIMER_STOP;
+    MANUAL_TIMER_END;
 
     square(v);
     HOTLOOPEND;

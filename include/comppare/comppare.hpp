@@ -542,7 +542,7 @@ namespace comppare
 #define MANUAL_TIMER_START \
     auto t_manual_start = comppare::config::clock_t::now();
 
-#define MANUAL_TIMER_STOP                                  \
+#define MANUAL_TIMER_END                                  \
     auto t_manual_stop = comppare::config::clock_t::now(); \
     SET_ITERATION_TIME(t_manual_stop - t_manual_start);
 
@@ -628,7 +628,7 @@ namespace comppare
     cudaEventCreate(&stop_manual_timer);               \
     cudaEventRecord(start_manual_timer);
 
-#define GPU_MANUAL_TIMER_STOP                                                \
+#define GPU_MANUAL_TIMER_END                                                \
     cudaEventRecord(stop_manual_timer);                                      \
     cudaEventSynchronize(stop_manual_timer);                                 \
     float ms_manual;                                                         \
@@ -644,7 +644,7 @@ namespace comppare
     hipEventCreate(&stop_manual_timer);               \
     hipEventRecord(start_manual_timer);
 
-#define GPU_MANUAL_TIMER_STOP                                               \
+#define GPU_MANUAL_TIMER_END                                               \
     hipEventRecord(stop_manual_timer);                                      \
     hipEventSynchronize(stop_manual_timer);                                 \
     float ms_manual;                                                        \
