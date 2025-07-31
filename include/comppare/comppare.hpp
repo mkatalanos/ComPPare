@@ -622,13 +622,13 @@ namespace comppare
 #endif
 
 #if defined(__CUDACC__)
-#define GPU_START_MANUAL_TIMER                         \
+#define GPU_MANUAL_TIMER_START                         \
     cudaEvent_t start_manual_timer, stop_manual_timer; \
     cudaEventCreate(&start_manual_timer);              \
     cudaEventCreate(&stop_manual_timer);               \
     cudaEventRecord(start_manual_timer);
 
-#define GPU_STOP_MANUAL_TIMER                                                \
+#define GPU_MANUAL_TIMER_STOP                                                \
     cudaEventRecord(stop_manual_timer);                                      \
     cudaEventSynchronize(stop_manual_timer);                                 \
     float ms_manual;                                                         \
@@ -638,13 +638,13 @@ namespace comppare
     cudaEventDestroy(stop_manual_timer);
 
 #elif defined(__HIPCC__)
-#define GPU_START_MANUAL_TIMER                        \
+#define GPU_MANUAL_TIMER_START                        \
     hipEvent_t start_manual_timer, stop_manual_timer; \
     hipEventCreate(&start_manual_timer);              \
     hipEventCreate(&stop_manual_timer);               \
     hipEventRecord(start_manual_timer);
 
-#define GPU_STOP_MANUAL_TIMER                                               \
+#define GPU_MANUAL_TIMER_STOP                                               \
     hipEventRecord(stop_manual_timer);                                      \
     hipEventSynchronize(stop_manual_timer);                                 \
     float ms_manual;                                                        \
