@@ -94,7 +94,7 @@ The executable takes the following command-line arguments:
 ### Example
 
 ```bash
-./saxpy --size 27 --scalar 10.98 --iter 100
+./saxpy --size 27 --scalar 10.98
 ```
 
 
