@@ -331,8 +331,7 @@ From these results, it shows that to avoid compiler optimizing away the operatio
 ---
 
 ## 5. Google Benchmark's Solution
-
-The answer to the seemingly conflicting ideas of: `optimize`, `keep my operation` was solved by Google in their [benchmark](https://github.com/google/benchmark) -- a microbenchmarking library. Google Benchmark provides `benchmark::DoNotOptimize()` to prevent variables from being optimized away.
+Optimization is important to understand the performance of particular operations in production builds. This creates the conflicting ideas of `optimize` but `do not optimize away`. This was solved by Google in their [benchmark](https://github.com/google/benchmark) -- a microbenchmarking library. Google Benchmark provides `benchmark::DoNotOptimize()` to prevent variables from being optimized away.
 
 With the same SAXPY function, we simply add DoNotOptimize() around the temporary variable `yout`
 ```cpp
@@ -362,7 +361,7 @@ ${CXX} -O3 -std=c++20 -S -o saxpy_DoNotOptimize.s saxpy_DoNotOptimize.cpp
 Compiled with `Apple clang version 15.0.0 (clang-1500.3.9.4)` on `arm64-apple-darwin23.1.0`:
 
 <!-- <details> -->
-<summary> Full x86_64 Assembly code of <code>SAXPY_DONOTOPTIMIZE()</code> with <code>-O3</code> optimization </summary>
+<summary> Full AArch64 Assembly code of <code>SAXPY_DONOTOPTIMIZE()</code> with <code>-O3</code> optimization </summary>
 <pre><code class="language-asm">
 <!-- <span style="opacity:0.5; font-size:smaller; display:inline-block; width:3em; text-align:right;">1</span>       .section        __TEXT,__text,regular,pure_instructions
 <span style="opacity:0.5; font-size:smaller; display:inline-block; width:3em; text-align:right;">2</span>       .build_version macos, 14, 0     sdk_version 14, 4
