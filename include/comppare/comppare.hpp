@@ -458,9 +458,14 @@ namespace comppare
                                inputs_);
 
                     // Calculate the time taken by the function in microseconds
-                    double roi_us = comppare::config::get_roi_us() / static_cast<double>(comppare::config::bench_iters());
-                    double func_us = func_duration / static_cast<double>(comppare::config::bench_iters());
+                    double roi_us = comppare::config::get_roi_us();
+                    double warmup_us = comppare::config::get_warmup_us();
+                    double func_us = func_duration - warmup_us;
                     double ovhd_us = func_us - roi_us;
+
+                    roi_us /= static_cast<double>(comppare::config::bench_iters());
+                    func_us /= static_cast<double>(comppare::config::bench_iters());
+                    ovhd_us /= static_cast<double>(comppare::config::bench_iters());
 
                     PolicyTup errs{};
                     if (k)
@@ -502,8 +507,11 @@ namespace comppare
 
 #define COMPPARE_HOTLOOPEND                                            \
     /* Warm-up */                                                      \
+    auto warmup_t0 = comppare::config::clock_t::now();                 \
     for (std::size_t i = 0; i < comppare::config::warmup_iters(); ++i) \
         hotloop_body();                                                \
+    auto warmup_t1 = comppare::config::clock_t::now();                 \
+    comppare::config::set_warmup_us(warmup_t0, warmup_t1);             \
                                                                        \
     /* Timed */                                                        \
     comppare::config::reset_roi_us();                                  \
@@ -569,19 +577,23 @@ namespace comppare
     }                                                                  \
     ; /* end lambda */                                                 \
     /* Warm-up */                                                      \
-    for (std::size_t i = 0; i < comppare::config::warmup_iters(); ++i) \
-        hotloop_body();                                                \
-                                                                       \
-    /* Timed */                                                        \
-    comppare::config::reset_roi_us();                                  \
     cudaEvent_t start_, stop_;                                         \
     cudaEventCreate(&start_);                                          \
     cudaEventCreate(&stop_);                                           \
     cudaEventRecord(start_);                                           \
+    for (std::size_t i = 0; i < comppare::config::warmup_iters(); ++i) \
+        hotloop_body();                                                \
+    cudaEventRecord(stop_);                                            \
+    cudaEventSynchronize(stop_);                                       \
+    float ms_warmup_;                                                  \
+    cudaEventElapsedTime(&ms_warmup_, start_, stop_);                  \
+    comppare::config::set_warmup_us(1e3 * ms_warmup_);                 \
                                                                        \
+    /* Timed */                                                        \
+    comppare::config::reset_roi_us();                                  \
+    cudaEventRecord(start_);                                           \
     for (std::size_t i = 0; i < comppare::config::bench_iters(); ++i)  \
         hotloop_body();                                                \
-                                                                       \
     cudaEventRecord(stop_);                                            \
     cudaEventSynchronize(stop_);                                       \
     float ms_;                                                         \
@@ -592,33 +604,35 @@ namespace comppare
     cudaEventDestroy(stop_);
 
 #elif defined(__HIPCC__)
-
 #define GPU_HOTLOOPEND                                                 \
     }                                                                  \
     ; /* end lambda */                                                 \
     /* Warm-up */                                                      \
+    hipEvent_t start_, stop_;                                         \
+    hipEventCreate(&start_);                                          \
+    hipEventCreate(&stop_);                                           \
+    hipEventRecord(start_);                                           \
     for (std::size_t i = 0; i < comppare::config::warmup_iters(); ++i) \
         hotloop_body();                                                \
+    hipEventRecord(stop_);                                            \
+    hipEventSynchronize(stop_);                                       \
+    float ms_warmup_;                                                  \
+    hipEventElapsedTime(&ms_warmup_, start_, stop_);                  \
+    comppare::config::set_warmup_us(1e3 * ms_warmup_);                 \
                                                                        \
     /* Timed */                                                        \
     comppare::config::reset_roi_us();                                  \
-    hipEvent_t start_, stop_;                                          \
-    hipEventCreate(&start_);                                           \
-    hipEventCreate(&stop_);                                            \
-    hipEventRecord(start_);                                            \
-                                                                       \
+    hipEventRecord(start_);                                           \
     for (std::size_t i = 0; i < comppare::config::bench_iters(); ++i)  \
         hotloop_body();                                                \
-                                                                       \
-    hipEventRecord(stop_);                                             \
-    hipEventSynchronize(stop_);                                        \
+    hipEventRecord(stop_);                                            \
+    hipEventSynchronize(stop_);                                       \
     float ms_;                                                         \
-    hipEventElapsedTime(&ms_, start_, stop_);                          \
+    hipEventElapsedTime(&ms_, start_, stop_);                         \
     if (comppare::config::get_roi_us() == double(0.0))                 \
         comppare::config::set_roi_us(1e3 * ms_);                       \
-    hipEventDestroy(start_);                                           \
+    hipEventDestroy(start_);                                          \
     hipEventDestroy(stop_);
-
 #endif
 
 #if defined(__CUDACC__)

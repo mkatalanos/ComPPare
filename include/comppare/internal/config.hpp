@@ -73,7 +73,21 @@ namespace comppare
         static void increment_roi_us(const double v) { instance().roi_ += v; }
         static void increment_roi_us(const float v) { instance().roi_ += static_cast<double>(v); }
 
+        static void set_warmup_us(const time_point_t &start, const time_point_t &end) { instance().warmup_ = std::chrono::duration<double, std::micro>(end - start).count(); }
+        static void set_warmup_us(const float start, const float end) { instance().warmup_ = static_cast<double>(end - start); }
+        static void set_warmup_us(const double start, const double end) { instance().warmup_ = end - start; }
+
+        template <typename Rep, typename Period>
+        static void set_warmup_us(std::chrono::duration<Rep, Period> v)
+        {
+            double micros = std::chrono::duration<double, std::micro>(v).count();
+            instance().warmup_ = micros;
+        }
+        static void set_warmup_us(const double v) { instance().warmup_ = v; }
+        static void set_warmup_us(const float v) { instance().warmup_ = static_cast<double>(v); }
+
         static double get_roi_us() { return instance().roi_; }
+        static double get_warmup_us() { return instance().warmup_; }
 
         template <std::floating_point T>
         static T &fp_tolerance()
@@ -105,6 +119,7 @@ namespace comppare
         }
 
         double roi_{0.0};
+        double warmup_{0.0};
         uint64_t warmup_iters_{100};
         uint64_t bench_iters_{100};
     };
