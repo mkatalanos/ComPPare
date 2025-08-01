@@ -201,7 +201,7 @@ void gpu_max(std::span<const float> in,
     }
     // Final swap to ensure the final result is in d_output
     std::swap(d_input, d_output);
-    GPU_MANUAL_TIMER_STOP;
+    GPU_MANUAL_TIMER_END;
     GPU_HOTLOOPEND;
 
     cudaMemcpy(&out, d_output, sizeof(float), cudaMemcpyDeviceToHost);
