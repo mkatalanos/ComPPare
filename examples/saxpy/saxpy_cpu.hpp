@@ -11,8 +11,9 @@ void cpu_omp(float a,
              const std::vector<float> &x,
              const std::vector<float> &y_in,
              std::vector<float> &y_out);
-
+#ifndef __clang__
 void cpu_par(float a,
              const std::vector<float> &x,
              const std::vector<float> &y_in,
              std::vector<float> &y_out);
+#endif

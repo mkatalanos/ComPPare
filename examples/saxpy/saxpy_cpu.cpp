@@ -1,6 +1,9 @@
 #include <vector>
 #include <algorithm>
+#ifndef __clang__
 #include <execution>
+#endif
+#include <omp.h>
 
 #include <comppare/comppare.hpp>
 
@@ -39,6 +42,7 @@ void cpu_omp(float a,
     HOTLOOPEND;
 }
 
+#ifndef __clang__
 void cpu_par(float a,
              const std::vector<float> &x,
              const std::vector<float> &y_in,
@@ -59,3 +63,4 @@ void cpu_par(float a,
         });
     HOTLOOPEND;
 }
+#endif

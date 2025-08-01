@@ -47,6 +47,8 @@ if (NOT USE_CUDA)
       ${CMAKE_THREAD_LIBS_INIT}
       stdc++
       m
+      OpenMP::OpenMP_CXX
+      TBB::tbb
   )
   return()
 endif()
