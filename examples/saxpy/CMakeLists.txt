@@ -16,6 +16,8 @@ include_directories(
 )
 
 find_package(Threads REQUIRED)
+find_package(OpenMP REQUIRED)
+find_package(TBB REQUIRED)
 
 set(CPP_SOURCES
     main.cpp
@@ -99,6 +101,8 @@ target_link_libraries(${PROJECT_NAME}
                       ${CMAKE_THREAD_LIBS_INIT}
                       stdc++
                       m
+                      OpenMP::OpenMP_CXX
+                      TBB::tbb
 )
 
 # Detect CUDA architectures supported by nvcc 

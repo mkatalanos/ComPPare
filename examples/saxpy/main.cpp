@@ -25,7 +25,8 @@ int main(int argc, char **argv)
     // Set reference implementation
     compare.set_reference("cpu serial", cpu_std);
     // Add implementations to compare
-    compare.add("cpu parallel", cpu_par);
+    compare.add("cpu OpenMP", cpu_omp);
+    compare.add("cpu cpp threads", cpu_par);
 #if (HAVE_CUDA)
     compare.add("gpu kernel", gpu_std);
 #endif
