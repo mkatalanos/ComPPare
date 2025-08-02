@@ -1,8 +1,6 @@
 #include <vector>
 #include <algorithm>
-#ifndef __clang__
-#include <execution>
-#endif
+#include <thread>
 #include <omp.h>
 
 #include <comppare/comppare.hpp>
@@ -42,7 +40,6 @@ void cpu_omp(float a,
     HOTLOOPEND;
 }
 
-#ifndef __clang__
 void cpu_par(float a,
              const std::vector<float> &x,
              const std::vector<float> &y_in,
@@ -51,16 +48,27 @@ void cpu_par(float a,
     size_t N = x.size();
     y_out.resize(N);
 
-    HOTLOOPSTART;
-    std::transform(
-        std::execution::par_unseq,
-        x.begin(), x.end(),
-        y_in.begin(),
-        y_out.begin(),
-        [a](auto xi, auto yi)
+    unsigned nThreads = std::thread::hardware_concurrency();
+    size_t chunk = (N + nThreads - 1) / nThreads;
+
+    auto worker = [&](size_t start, size_t end)
+    {
+        for (size_t i = start; i < end && i < N; ++i)
         {
-            return a * xi + yi;
-        });
+            y_out[i] = a * x[i] + y_in[i];
+        }
+    };
+
+    HOTLOOPSTART;
+    std::vector<std::thread> threads;
+    threads.reserve(nThreads);
+    for (unsigned t = 0; t < nThreads; ++t)
+    {
+        size_t start = t * chunk;
+        size_t end = start + chunk;
+        threads.emplace_back(worker, start, end);
+    }
+    for (auto &th : threads)
+        th.join();
     HOTLOOPEND;
 }
-#endif

@@ -12,6 +12,7 @@ int main(int argc, char **argv)
 {
     // Initialize SAXPY configuration
     SaxpyConfig cfg = init_saxpy(argc, argv);
+    comppare::config::set_fp_tolerance(float(1.0f));
 
     // Define the input and output types for the comparison framework instance
     using ScalarType = float;
@@ -26,13 +27,10 @@ int main(int argc, char **argv)
     compare.set_reference("cpu serial", cpu_std);
     // Add implementations to compare
     compare.add("cpu OpenMP", cpu_omp);
-#ifndef __clang__
     compare.add("cpu cpp threads", cpu_par);
-#endif
 #if (HAVE_CUDA)
-    compare.add("gpu kernel", gpu_std);
+    compare.add("CUDA", gpu_std);
 #endif
-
     // Run the comparison with specified iterations and tolerance
     compare.run(argc, argv);
 

@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <random>
+#include <omp.h>
 
 #include "init_saxpy.hpp"
 
@@ -38,6 +39,8 @@ SaxpyConfig init_saxpy(int argc, char **argv)
     cfg.y.resize(cfg.N);
     std::mt19937_64 rng(std::random_device{}());
     std::uniform_real_distribution<float> dist(-1e6f, 1e6f);
+
+#pragma omp parallel for firstprivate(rng, dist)
     for (size_t i = 0; i < cfg.N; ++i)
     {
         cfg.x[i] = dist(rng);
