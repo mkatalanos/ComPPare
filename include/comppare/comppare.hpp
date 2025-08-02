@@ -68,7 +68,7 @@ namespace comppare
     // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     // See the License for the specific language governing permissions and
     // limitations under the License.
-    
+
     // This implementation is verbatim from Google Benchmark’s benchmark::DoNotOptimize(),
     // licensed under Apache 2.0. No changes have been made.
     template <typename T>
@@ -505,7 +505,7 @@ namespace comppare
 #define HOTLOOPSTART \
     auto &&hotloop_body = [&]() { /* start of lambda */
 
-#define COMPPARE_HOTLOOPEND                                            \
+#define COMPPARE_HOTLOOP_BENCH                                         \
     /* Warm-up */                                                      \
     auto warmup_t0 = comppare::config::clock_t::now();                 \
     for (std::size_t i = 0; i < comppare::config::warmup_iters(); ++i) \
@@ -523,25 +523,25 @@ namespace comppare
     if (comppare::config::get_roi_us() == double(0.0))                 \
         comppare::config::set_roi_us(t0, t1);
 
-#ifdef PLUGIN_HOTLOOPEND
+#ifdef PLUGIN_HOTLOOP_BENCH
 #define HOTLOOPEND                               \
     }                                            \
     ; /* end lambda */                           \
                                                  \
     if (comppare::current_state::using_plugin()) \
     {                                            \
-        PLUGIN_HOTLOOPEND;                       \
+        PLUGIN_HOTLOOP_BENCH;                    \
     }                                            \
     else                                         \
     {                                            \
-        COMPPARE_HOTLOOPEND;                     \
+        COMPPARE_HOTLOOP_BENCH;                  \
     }
 #else
 #define HOTLOOPEND     \
     }                  \
     ; /* end lambda */ \
                        \
-    COMPPARE_HOTLOOPEND;
+    COMPPARE_HOTLOOP_BENCH;
 #endif
 
 #define HOTLOOP(LOOP_BODY) \
@@ -550,11 +550,11 @@ namespace comppare
 #define MANUAL_TIMER_START \
     auto t_manual_start = comppare::config::clock_t::now();
 
-#define MANUAL_TIMER_END                                  \
+#define MANUAL_TIMER_END                                   \
     auto t_manual_stop = comppare::config::clock_t::now(); \
     SET_ITERATION_TIME(t_manual_stop - t_manual_start);
 
-#ifdef PLUGIN_HOTLOOPEND
+#ifdef PLUGIN_HOTLOOP_BENCH
 #define SET_ITERATION_TIME(TIME)                  \
     if (comppare::current_state::using_plugin())  \
     {                                             \
@@ -608,30 +608,30 @@ namespace comppare
     }                                                                  \
     ; /* end lambda */                                                 \
     /* Warm-up */                                                      \
-    hipEvent_t start_, stop_;                                         \
-    hipEventCreate(&start_);                                          \
-    hipEventCreate(&stop_);                                           \
-    hipEventRecord(start_);                                           \
+    hipEvent_t start_, stop_;                                          \
+    hipEventCreate(&start_);                                           \
+    hipEventCreate(&stop_);                                            \
+    hipEventRecord(start_);                                            \
     for (std::size_t i = 0; i < comppare::config::warmup_iters(); ++i) \
         hotloop_body();                                                \
-    hipEventRecord(stop_);                                            \
-    hipEventSynchronize(stop_);                                       \
+    hipEventRecord(stop_);                                             \
+    hipEventSynchronize(stop_);                                        \
     float ms_warmup_;                                                  \
-    hipEventElapsedTime(&ms_warmup_, start_, stop_);                  \
+    hipEventElapsedTime(&ms_warmup_, start_, stop_);                   \
     comppare::config::set_warmup_us(1e3 * ms_warmup_);                 \
                                                                        \
     /* Timed */                                                        \
     comppare::config::reset_roi_us();                                  \
-    hipEventRecord(start_);                                           \
+    hipEventRecord(start_);                                            \
     for (std::size_t i = 0; i < comppare::config::bench_iters(); ++i)  \
         hotloop_body();                                                \
-    hipEventRecord(stop_);                                            \
-    hipEventSynchronize(stop_);                                       \
+    hipEventRecord(stop_);                                             \
+    hipEventSynchronize(stop_);                                        \
     float ms_;                                                         \
-    hipEventElapsedTime(&ms_, start_, stop_);                         \
+    hipEventElapsedTime(&ms_, start_, stop_);                          \
     if (comppare::config::get_roi_us() == double(0.0))                 \
         comppare::config::set_roi_us(1e3 * ms_);                       \
-    hipEventDestroy(start_);                                          \
+    hipEventDestroy(start_);                                           \
     hipEventDestroy(stop_);
 #endif
 
@@ -642,7 +642,7 @@ namespace comppare
     cudaEventCreate(&stop_manual_timer);               \
     cudaEventRecord(start_manual_timer);
 
-#define GPU_MANUAL_TIMER_END                                                \
+#define GPU_MANUAL_TIMER_END                                                 \
     cudaEventRecord(stop_manual_timer);                                      \
     cudaEventSynchronize(stop_manual_timer);                                 \
     float ms_manual;                                                         \
@@ -658,7 +658,7 @@ namespace comppare
     hipEventCreate(&stop_manual_timer);               \
     hipEventRecord(start_manual_timer);
 
-#define GPU_MANUAL_TIMER_END                                               \
+#define GPU_MANUAL_TIMER_END                                                \
     hipEventRecord(stop_manual_timer);                                      \
     hipEventSynchronize(stop_manual_timer);                                 \
     float ms_manual;                                                        \
@@ -668,3 +668,6 @@ namespace comppare
     hipEventDestroy(stop_manual_timer);
 
 #endif
+
+#undef COMPPARE_HOTLOOP_BENCH
+#undef PLUGIN_HOTLOOP_BENCH

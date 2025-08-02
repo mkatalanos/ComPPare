@@ -240,7 +240,7 @@ namespace comppare::plugin::google_benchmark
 
 }
 
-#define PLUGIN_HOTLOOPEND                                                          \
+#define PLUGIN_HOTLOOP_BENCH                                                       \
     benchmark::State &st = comppare::plugin::google_benchmark::state::get_state(); \
     for (auto _ : st)                                                              \
     {                                                                              \
