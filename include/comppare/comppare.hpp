@@ -423,9 +423,9 @@ namespace comppare
                           << std::left
                           << std::setw(PRINT_COL_WIDTH) << "Implementation"
                           << std::right
-                          << std::setw(PRINT_COL_WIDTH) << "Func µs/Iter"
                           << std::setw(PRINT_COL_WIDTH) << "ROI µs/Iter"
-                          << std::setw(PRINT_COL_WIDTH) << "Ovhd µs/Iter";
+                          << std::setw(PRINT_COL_WIDTH) << "Func µs"
+                          << std::setw(PRINT_COL_WIDTH) << "Ovhd µs";
 
                 header_row(std::make_index_sequence<NUM_OUT>{});
 
@@ -464,8 +464,6 @@ namespace comppare
                     double ovhd_us = func_us - roi_us;
 
                     roi_us /= static_cast<double>(comppare::config::bench_iters());
-                    func_us /= static_cast<double>(comppare::config::bench_iters());
-                    ovhd_us /= static_cast<double>(comppare::config::bench_iters());
 
                     PolicyTup errs{};
                     if (k)
@@ -478,10 +476,11 @@ namespace comppare
                               << std::left << std::setw(PRINT_COL_WIDTH) << comppare::internal::ansi::GREEN(impl.name)
                               << std::fixed << std::setprecision(2) << std::right
                               << comppare::internal::ansi::YELLOW
-                              << std::setw(PRINT_COL_WIDTH) << func_us
                               << std::setw(PRINT_COL_WIDTH) << roi_us
+                              << comppare::internal::ansi::DIM
+                              << std::setw(PRINT_COL_WIDTH) << func_us
                               << std::setw(PRINT_COL_WIDTH) << ovhd_us
-                              << comppare::internal::ansi::YELLOW_OFF;
+                              << comppare::internal::ansi::RESET;
 
                     print_metrics(errs, std::make_index_sequence<NUM_OUT>{});
                     if (k && any_fail(errs, std::make_index_sequence<NUM_OUT>{}))
@@ -668,6 +667,3 @@ namespace comppare
     hipEventDestroy(stop_manual_timer);
 
 #endif
-
-#undef COMPPARE_HOTLOOP_BENCH
-#undef PLUGIN_HOTLOOP_BENCH
