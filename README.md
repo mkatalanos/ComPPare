@@ -26,11 +26,11 @@ ComPPare lets you time and cross‑check any number of host‑side implementatio
 ## Install
 ### 1. Clone repository
 ```bash
-git clone git@github.com:funglf/ComPPare.git --recursive
+git clone https://github.com/funglf/ComPPare.git --recursive
 ```
 #### If submodules like google benchmark/ nvbench is not needed:
 ```bash
-git clone git@github.com:funglf/ComPPare.git
+git clone https://github.com/funglf/ComPPare.git
 ```
 
 ### 2. (Optional) Build Google Benchmark
