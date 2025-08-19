@@ -2,22 +2,22 @@
 
 Copyright 2025 | Leong Fan FUNG | funglf | stanleyfunglf@gmail.com
 
-Permission is hereby granted, free of charge, to any person obtaining a copy 
-of this software and associated documentation files (the “Software”), to deal 
-in the Software without restriction, including without limitation the rights 
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-copies of the Software, and to permit persons to whom the Software is 
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the “Software”), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in 
+The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 */
@@ -43,7 +43,7 @@ namespace comppare::internal::helper
         else
             throw std::invalid_argument(std::string(option) + " requires a value");
 
-        
+
         if constexpr (std::same_as<T, std::string>)
         {
             return std::string(valstr);
@@ -70,7 +70,7 @@ namespace comppare::internal::helper
                 if (!s.empty() && s.front() == '-') // if negative -- reject
                     throw std::invalid_argument("invalid unsigned integer for " + std::string(option));
 
-                unsigned long long tmp = std::stoull(s, &idx); 
+                unsigned long long tmp = std::stoull(s, &idx);
                 if (idx != s.size()) // if not all characters were processed
                     throw std::invalid_argument("invalid unsigned integer for " + std::string(option));
 
@@ -97,6 +97,9 @@ namespace comppare::internal::helper
 
     static inline void parse_args(int argc, char **argv)
     {
+        if (!argv)
+            return;
+
         for (int i = 1; i < argc; ++i)
         {
             std::string_view arg = argv[i];
