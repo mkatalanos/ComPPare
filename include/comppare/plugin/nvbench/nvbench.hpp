@@ -90,8 +90,7 @@ namespace comppare::plugin::nvbenchplugin
 
         void initialize(int &argc, char **argv)
         {
-            comppare::plugin::PluginArgParser nvbench_parser("--nvbench");
-            auto [tmp_argc, tmp_argv] = nvbench_parser.parse(argc, argv);
+            auto [tmp_argc, tmp_argv] = nvbench_parser_.parse(argc, argv);
             nvbench_argc = tmp_argc;
             nvbench_argv = tmp_argv;
             print_benchmark_header();
@@ -134,6 +133,7 @@ namespace comppare::plugin::nvbenchplugin
     private:
         int nvbench_argc;
         char** nvbench_argv;
+        comppare::plugin::PluginArgParser nvbench_parser_{"--nvbench"};
 
         void print_benchmark_header()
         {
