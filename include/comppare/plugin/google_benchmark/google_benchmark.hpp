@@ -184,7 +184,6 @@ namespace comppare::plugin::google_benchmark
     class GoogleBenchmarkPlugin final : public Plugin<InTup, OutTup>
     {
         using Self = GoogleBenchmarkPlugin<InTup, OutTup>;
-        using Func = std::function<void(const InTup &, OutTup &)>;
         comppare::plugin::google_benchmark::google_benchmark_manager gb_;
 
     public:
@@ -197,16 +196,16 @@ namespace comppare::plugin::google_benchmark
             return inst;
         }
 
-        template <class F>
+        template <class Func>
         benchmark::internal::Benchmark *register_impl(const std::string &name,
-                                                      F &&user_fn,
+                                                      Func &&user_fn,
                                                       const InTup &inputs,
                                                       OutTup &outs)
         {
             return std::apply([&](auto const &...in_vals)
                               { return std::apply([&](auto &&...outs_vals)
                                                   { return gb_.add_gbench(name.c_str(),
-                                                                          std::forward<F>(user_fn),
+                                                                          std::forward<Func>(user_fn),
                                                                           in_vals..., outs_vals...); }, outs); }, inputs);
         }
 
