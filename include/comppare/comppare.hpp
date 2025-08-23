@@ -41,8 +41,14 @@ SOFTWARE.
 #include <comppare/internal/policy.hpp>
 #include <comppare/plugin/plugin.hpp>
 
-#ifdef HAVE_GOOGLE_BENCHMARK
+#if defined(HAVE_GOOGLE_BENCHMARK) && defined(HAVE_NV_BENCH)
+#error "Please only use one Plugin." 
+#endif
+
+#if defined(HAVE_GOOGLE_BENCHMARK)
 #include "comppare/plugin/google_benchmark/google_benchmark.hpp"
+#elif defined(HAVE_NV_BENCH)
+#include "comppare/plugin/nvbench/nvbench.hpp"
 #endif
 
 namespace comppare
@@ -210,8 +216,15 @@ namespace comppare
                 }
 #endif
 
+#ifdef HAVE_NV_BENCH
+                decltype(auto) nvbench()
+                {
+                    return attach<plugin::nvbenchplugin::nvbenchPlugin>();
+                }
+#endif
+
                 template <template <class, class> class Plugin>
-                    requires std::is_base_of_v<plugin::Plugin<InTup, OutTup>, Plugin<InTup, OutTup>>
+                    requires comppare::plugin::ValidPlugin<Plugin, InTup, OutTup, Func>
                 decltype(auto) attach()
                 {
                     auto adp = Plugin<InTup, OutTup>::instance();
@@ -234,44 +247,84 @@ namespace comppare
             static constexpr auto spec_metric_name(std::size_t m) { return std::tuple_element_t<I, PolicyTup>::metric_name(m); }
 
             static constexpr int PRINT_COL_WIDTH = 20;
-            template <std::size_t... I>
-            void header_row(std::index_sequence<I...>) const
-            {
-                (([&]()
-                  { 
-                    for(std::size_t m=0;m<spec_metric_count<I>();++m) 
-                    {
-                        std::cout<< std::setw(PRINT_COL_WIDTH)<< 
-                        comppare::internal::ansi::UNDERLINE(
-                        comppare::internal::ansi::BOLD(
-                            (std::string(spec_metric_name<I>(m))+"["+std::to_string(I)+"]")
-                        ));
-                        
-                    } }()),
-                 ...);
+
+            void print_header() const {
+                std::cout << std::left << comppare::internal::ansi::BOLD
+                          << "*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=\n============ "
+                          << comppare::internal::ansi::ITALIC("ComPPare Framework")
+                          << " ============\n=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*"
+                          << comppare::internal::ansi::BOLD_OFF << "\n\n";
+                std::cout
+                    << std::left << std::setw(30) << "Number of implementations: "
+                    << std::right << std::setw(10) << impls_.size() << "\n"
+                    << std::left << std::setw(30) << "Warmup iterations: "
+                    << std::right << std::setw(10) << comppare::config::warmup_iters() << "\n"
+                    << std::left << std::setw(30) << "Benchmark iterations: "
+                    << std::right << std::setw(10) << comppare::config::bench_iters() << "\n"
+                    << std::left << comppare::internal::ansi::BOLD("=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*") << "\n\n";
+
+                // Print header for the output table
+                std::cout << comppare::internal::ansi::UNDERLINE << comppare::internal::ansi::BOLD
+                          << std::left
+                          << std::setw(PRINT_COL_WIDTH) << "Implementation"
+                          << std::right
+                          << std::setw(PRINT_COL_WIDTH) << "ROI µs/Iter"
+                          << std::setw(PRINT_COL_WIDTH) << "Func µs"
+                          << std::setw(PRINT_COL_WIDTH) << "Ovhd µs";
+
+                // prints metric header 
+                auto&& _print_metric_header = [this]<std::size_t I>() {
+                    for (std::size_t m = 0; m < this->template spec_metric_count<I>(); ++m) {
+                        std::cout << std::setw(PRINT_COL_WIDTH)
+                                << comppare::internal::ansi::UNDERLINE(
+                                    comppare::internal::ansi::BOLD(
+                                        std::string(this->template spec_metric_name<I>(m))
+                                        + "[" + std::to_string(I) + "]"));
+                    }
+                };
+                // lambda to call print metric header across each metric by unpacking I
+                [&]<std::size_t... I>(std::index_sequence<I...>) {
+                    ( _print_metric_header.template operator()<I>(), ... );
+                }(std::make_index_sequence<NUM_OUT>{});
+                
+                std::cout << std::endl;
             }
-            template <std::size_t... I>
-            void compute_errors(PolicyTup &errs, const OutTup &test, const OutTup &ref, std::index_sequence<I...>)
+
+
+            void compute_errors(PolicyTup &errs, const OutTup &test, const OutTup &ref)
             {
-                (comppare::internal::policy::compute_error(std::get<I>(errs), std::get<I>(test), std::get<I>(ref)), ...);
+                auto && _compute_errors = [&]<std::size_t I>()
+                {comppare::internal::policy::compute_error(std::get<I>(errs), std::get<I>(test), std::get<I>(ref));};
+
+                [&]<std::size_t... I>(std::index_sequence<I...>) {
+                    (_compute_errors.template operator()<I>(), ...);
+                }(std::make_index_sequence<NUM_OUT>{});
             }
-            template <std::size_t... I>
-            bool any_fail(const PolicyTup &errs, std::index_sequence<I...>) const
+
+            bool any_fail(const PolicyTup &errs) const
             {
-                bool fail = false;
-                ((fail |= comppare::internal::policy::is_fail(std::get<I>(errs))), ...);
-                return fail;
+                auto && _any_fail = [&]<std::size_t I>()->bool{
+                    return comppare::internal::policy::is_fail(std::get<I>(errs));
+                };
+
+                return [&]<std::size_t... I>(std::index_sequence<I...>)->bool{
+                    bool fail = false;
+                    ((fail |= _any_fail.template operator()<I>()), ...);
+                    return fail;
+                }(std::make_index_sequence<NUM_OUT>{});
             }
-            template <std::size_t... I>
-            void print_metrics(const PolicyTup &errs, std::index_sequence<I...>) const
+
+            void print_metrics(const PolicyTup &errs) const
             {
-                (([&]()
-                  {
+                auto&& _print_metrics = [this, &errs]<std::size_t I>(){
                       for (std::size_t m = 0; m < spec_metric_count<I>(); ++m)
-                      {
-                          std::cout << std::setw(PRINT_COL_WIDTH) << std::scientific << std::get<I>(errs).metric(m);
-                      } }()),
-                 ...);
+                       std::cout << std::setw(PRINT_COL_WIDTH) << std::scientific << std::get<I>(errs).metric(m);
+                    };
+
+                [&]<std::size_t... I>(std::index_sequence<I...>){
+                    (_print_metrics.template operator()<I>(),...);
+                }(std::make_index_sequence<NUM_OUT>{});
+                
             }
 
             inline OutPtr get_output_by_index_(const size_t idx) const
@@ -396,19 +449,6 @@ namespace comppare
                      char **argv = nullptr)
             {
                 comppare::internal::helper::parse_args(argc, argv);
-                std::cout << std::left << comppare::internal::ansi::BOLD
-                          << "*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=\n============ "
-                          << comppare::internal::ansi::ITALIC("ComPPare Framework")
-                          << " ============\n=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*"
-                          << comppare::internal::ansi::BOLD_OFF << "\n\n";
-                std::cout
-                    << std::left << std::setw(30) << "Number of implementations: "
-                    << std::right << std::setw(10) << impls_.size() << "\n"
-                    << std::left << std::setw(30) << "Warmup iterations: "
-                    << std::right << std::setw(10) << comppare::config::warmup_iters() << "\n"
-                    << std::left << std::setw(30) << "Benchmark iterations: "
-                    << std::right << std::setw(10) << comppare::config::bench_iters() << "\n"
-                    << std::left << comppare::internal::ansi::BOLD("=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*") << "\n\n";
 
                 if (impls_.empty())
                 {
@@ -418,18 +458,7 @@ namespace comppare
 
                 outputs_.reserve(impls_.size()); // reserve space for outputs -- resize and use index works too.
 
-                // Print header for the output table
-                std::cout << comppare::internal::ansi::UNDERLINE << comppare::internal::ansi::BOLD
-                          << std::left
-                          << std::setw(PRINT_COL_WIDTH) << "Implementation"
-                          << std::right
-                          << std::setw(PRINT_COL_WIDTH) << "ROI µs/Iter"
-                          << std::setw(PRINT_COL_WIDTH) << "Func µs"
-                          << std::setw(PRINT_COL_WIDTH) << "Ovhd µs";
-
-                header_row(std::make_index_sequence<NUM_OUT>{});
-
-                std::cout << std::endl;
+                print_header();
 
                 // Main loop to iterate over all implementations
                 for (size_t k = 0; k < impls_.size(); ++k)
@@ -468,7 +497,7 @@ namespace comppare
                     PolicyTup errs{};
                     if (k)
                     {
-                        compute_errors(errs, outs, *outputs_[0], std::make_index_sequence<NUM_OUT>{});
+                        compute_errors(errs, outs, *outputs_[0]);
                     }
                     outputs_.push_back(std::make_shared<OutTup>(std::move(outs)));
                     // print row
@@ -482,8 +511,8 @@ namespace comppare
                               << std::setw(PRINT_COL_WIDTH) << ovhd_us
                               << comppare::internal::ansi::RESET;
 
-                    print_metrics(errs, std::make_index_sequence<NUM_OUT>{});
-                    if (k && any_fail(errs, std::make_index_sequence<NUM_OUT>{}))
+                    print_metrics(errs);
+                    if (k && any_fail(errs))
                         std::cout << comppare::internal::ansi::BG_RED("<-- FAIL");
                     std::cout << '\n';
 
