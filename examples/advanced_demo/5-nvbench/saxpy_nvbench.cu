@@ -34,7 +34,7 @@ void saxpy_gpu(const float a, const std::vector<float> x, const std::vector<floa
 }
 
 void saxpy_cpu(const float a, const std::vector<float> x, const std::vector<float> y, std::vector<float> y_out) {
-    assert(x.size() == y.size());
+    y_out.resize(y.size());
 
     HOTLOOPSTART;
     for (size_t i = 0; i < x.size(); i++)
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     comppare::InputContext<float, std::vector<float>, std::vector<float>>::OutputContext<std::vector<float>> cmp(a, x, y);
 
     cmp.add("saxpy gpu", saxpy_gpu).nvbench();
-    // cmp.add("saxpy cpu", saxpy_cpu).nvbench().set_is_cpu_only(true);
+    cmp.add("saxpy cpu", saxpy_cpu).nvbench().set_is_cpu_only(true);
 
     cmp.run(argc, argv);
 }
