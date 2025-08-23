@@ -80,12 +80,13 @@ namespace comppare::plugin::google_benchmark
 
         void initialize(int &argc, char **argv)
         {
-            parse_args(argc, argv);
+            auto [tmp_argc, tmp_argv] = gbench_parser_.parse(argc, argv);
+            gbench_argc = tmp_argc;
+            gbench_argv = tmp_argv;
             print_benchmark_header();
 
-            int n = static_cast<int>(bench_argv_.size());
-            benchmark::Initialize(&n, bench_argv_.data());
-            benchmark::ReportUnrecognizedArguments(n, bench_argv_.data());
+            benchmark::Initialize(&gbench_argc, gbench_argv);
+            benchmark::ReportUnrecognizedArguments(gbench_argc, gbench_argv);
         }
 
         template <typename Func, typename... Args>
@@ -113,49 +114,9 @@ namespace comppare::plugin::google_benchmark
         }
 
     private:
-        std::vector<char *> bench_argv_;
-
-        static std::string strip_quotes(const std::string &s)
-        {
-            if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
-                return s.substr(1, s.size() - 2);
-            return s;
-        }
-
-        void parse_args(int &argc, char **argv)
-        {
-            std::vector<std::string> bench_flags;
-            int write_i = 1;
-
-            for (int read_i = 1; read_i < argc; ++read_i)
-            {
-                std::string cur(argv[read_i]);
-
-                if (cur.rfind("--gbench=", 0) == 0)
-                {
-                    // --gbench="...v..."
-                    std::string v = cur.substr(strlen("--gbench="));
-                    bench_flags.push_back(strip_quotes(v));
-                }
-                else if (cur == "--gbench" && read_i + 1 < argc)
-                {
-                    // --gbench "v"
-                    std::string v = argv[++read_i];
-                    bench_flags.push_back(strip_quotes(v));
-                }
-                else
-                {
-                    // keep this in argv[]
-                    argv[write_i++] = argv[read_i];
-                }
-            }
-            argc = write_i; // new argc, gbench flags removed
-
-            bench_argv_.clear();
-            bench_argv_.push_back(strdup(argv[0]));
-            for (auto &f : bench_flags)
-                bench_argv_.push_back(strdup(f.c_str()));
-        }
+        int gbench_argc;
+        char** gbench_argv;
+        comppare::plugin::PluginArgParser gbench_parser_{"--gbench"};
 
         void print_benchmark_header()
         {
@@ -168,10 +129,10 @@ namespace comppare::plugin::google_benchmark
                       << comppare::internal::ansi::BOLD_OFF << "\n\n";
 
             std::cout << "Google Benchmark cmdline arguments:\n";
-            for (size_t i = 0; i < bench_argv_.size(); ++i)
+            for (int i = 0; i < gbench_argc; ++i)
             {
                 std::cout << std::setw(2) << std::right << " "
-                          << "  [" << i << "] " << std::quoted(bench_argv_[i]) << "\n";
+                          << "  [" << i << "] " << std::quoted(gbench_argv[i]) << "\n";
             }
 
             std::cout << std::left
