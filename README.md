@@ -23,6 +23,11 @@ ComPPare lets you time and cross‑check any number of host‑side implementatio
 | Detailed timing         | Separates overall call time, your ROI time, and setup/transfer overhead.                   |
 | Built-in error comparison | For common data types, automatically choose the correct method and compares against reference function    |
 
+## Getting Started
+See [User Guide](docs/user_guide.md) for more detailed user guide and [Examples](examples/README.md) to see real life examples.
+
+Contributions are welcome! Please see [Code Documentation](https://funglf.github.io/ComPPare/) if interested in contributing to this repo.
+
 ## Install
 ### 1. Clone repository
 ```bash
