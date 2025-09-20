@@ -33,8 +33,10 @@ git clone https://github.com/funglf/ComPPare.git --recursive
 git clone https://github.com/funglf/ComPPare.git
 ```
 
-### 2. (Optional) Build Google Benchmark
+### 2. (Optional) Build Google Benchmark and nvbench
 See [Google Benchmark Instructions](https://github.com/google/benchmark/blob/b20cea674170b2ba45da0dfaf03953cdea473d0d/README.md) 
+
+See [nvbench Intructions](https://github.com/NVIDIA/nvbench/blob/b88a45f4170af4e907e69af22a55af67859d3b49/README.md)
 
 ### 3. Include ComPPare
 In your C++ code, simply include the comppare header file by:
@@ -94,27 +96,12 @@ void saxpy_gpu(/*Input types*/
 
 ### 2. Create a comparison object
 
-1. **Describe the types** — list the *input* types first, then the *output* types:
+1. **Describe the output types** as template argument
+2. **Pass the input data** — constructs framework object with input data that will be reused for every implementation
+
 
 ```cpp
-using Cmp = 
-    comppare::
-        /*Define Input Pack Types same as the function*/
-        InputContext<
-            float,  /*float a*/
-            std::vector<float>, /*std::vector<float> x*/
-            std::vector<float>  /*std::vector<float> y*/
-            >::
-                /*Define Output Pack types same as the function*/
-                OutputContext<
-                std::vector<float>  /*std::vector<float> y_out*/
-                >;
-```
-
-2. **Pass the input data** — constructs framework object with input data that will be reused for every implementation:
-
-```cpp
-Cmp cmp(a, x, y);   // a: float, x: input vector x, y: input vector y
+auto Cmp = comppare::make_comppare</*Output Types*/std::vector<float>>(a, x, y); // a: float, x: input vector x, y: input vector y
 ```
 > Note: you can use move semantics here. All inputs are perfectly forwarded. eg. `Cmp cmp(a, std::move(x), std::move(y));`
 
@@ -122,8 +109,8 @@ Cmp cmp(a, x, y);   // a: float, x: input vector x, y: input vector y
 ### 3. Register implementations
 
 ```cpp
-cmp.set_reference("cpu serial", saxpy_cpu);  // setting reference
-cmp.add("gpu kernel",  saxpy_gpu);           // any number of additional functions
+cmp.set_reference("saxpy reference", saxpy_cpu);  // setting reference
+cmp.add("saxpy gpu",  saxpy_gpu);           // any number of additional functions
 ```
 
 ### 4. Run and inspect
@@ -139,14 +126,14 @@ cmp.run(argc, argv);
 ============ ComPPare Framework ============
 =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
 
-Number of implementations:             3
+Number of implementations:             4
 Warmup iterations:                   100
 Benchmark iterations:                100
 =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
 
-Implementation                  Func µs             ROI µs            Ovhd µs         Max|err|[0]        Mean|err|[0]       Total|err|[0]
-cpu serial                         38.01               15.97               22.05            0.00e+00            0.00e+00            0.00e+00
-gpu kernel                      73151.41                1.07            73150.34            3.30e+06            1.66e+06            1.70e+09  <-- FAIL
+Implementation              ROI µs/Iter            Func µs            Ovhd µs         Max|err|[0]        Mean|err|[0]       Total|err|[0]
+saxpy reference                     0.28               33.67                5.63            0.00e+00            0.00e+00            0.00e+00                                   
+saxpy gpu                          10.89           137828.11           136739.02            5.75e+06            2.85e+06            2.92e+09            <-- FAIL         
 ```
 ### Complete example with SAXPY
 [(See SAXPY Full Example)](examples/saxpy/README.md)
@@ -185,26 +172,18 @@ int main(int argc, char **argv)
     std::vector<float> x(1000, 2.2); // Vector of size 1000 filled with 2.2
     std::vector<float> y(1000, 3.3); // Vector of size 1000 filled with 3.3
 
-    using Cmp = 
-    comppare::
-        /*Define Input Pack Types same as the function*/
-            InputContext<float, 
-                std::vector<float>, 
-                std::vector<float>>::
-                    /*Define Output Pack types same as the function*/
-                    OutputContext<std::vector<float>>;
     /*
     Create Instance of the comparison framework with input data
     a -- float
     x -- std::vector<float>
     y -- std::vector<float>
     */
-    Cmp cmp(a, x, y); // cmp is the instance
+    auto Cmp = comppare::make_comppare</*Output Types*/std::vector<float>>(a, x, y);
 
     // Set reference implementation
-    cmp.set_reference("cpu serial", /*Function*/ saxpy_cpu);
+    cmp.set_reference("saxpy reference", /*Function*/ saxpy_cpu);
     // Add implementations to compare
-    cmp.add("gpu kernel", /*Function*/ saxpy_gpu);
+    cmp.add("saxpy gpu", /*Function*/ saxpy_gpu);
 
     // Run the comparison with specified iterations and tolerance
     cmp.run(argc, argv);
