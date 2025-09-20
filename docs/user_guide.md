@@ -2,6 +2,7 @@
 - [1. Getting Started](#1-getting-started)
   - [1.1. Install](#11-install)
   - [1.2. Basic Usage](#12-basic-usage)
+      - [`--tolerance` Numerical Error tolerance](#--tolerance-numerical-error-tolerance)
   - [1.3. Basic Working Principle](#13-basic-working-principle)
 - [2. User API Documentation](#2-user-api-documentation)
   - [2.1. Macros](#21-macros)
@@ -105,17 +106,40 @@ void saxpy_cpu(/*Input types*/
 ```
 ---
 #### Step 1: Initialize Input data <!-- omit from toc -->
+The same input data will be used across different implementations. 
+They are needed to initialize the comppare object.
 ```cpp
 /* Intialize Input data */
 float a = 1.1f
 std::vector x(1000, 1.0); 
 std::vector y_in(1000, 2.0);
 ```
----
-#### Step 2: Create a Comparison Object <!-- omit from toc -->
-This step defines the input and output types of the functions you are about to test.
 
-For `saxpy_cpu`, the **input types** are:
+---
+
+#### Step 2: Create a Comparison Object <!-- omit from toc -->
+
+Before testing functions like `saxpy_cpu`, you must define:
+
+1. **Output type(s)** the types of the outputs that the function produces
+2. **Input variables** the same inputs that are used across different implementations
+
+For example, `saxpy_cpu` returns a vector of floats:
+
+```cpp
+std::vector<float>
+```
+
+Therefore, the **output type must be specified as the template parameter of `make_comppare`**.
+The function call then takes the **input variables (`a`, `x`, `y_in`) as arguments** (initialized in step1):
+
+```cpp
+auto cmp = comppare::make_comppare<std::vector<float>>(a, x, y_in);
+```
+
+---
+
+<!-- For `saxpy_cpu`, the **input types** are:
 ```cpp
 /* INPUTS: */
 float,
@@ -175,7 +199,7 @@ comppare:: /*namespace comppare*/
                  >;
     
     cmp(a,x,y_in);   //cmp object -- a,x,y data
-```
+``` -->
 
 #### Step 3: Register/Add Functions into framework <!-- omit from toc -->
 After creating the `cmp` object, we can add functions into it.
@@ -203,14 +227,14 @@ Example Output:
 ============ ComPPare Framework ============
 =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
 
-Number of implementations:             3
+Number of implementations:             4
 Warmup iterations:                   100
 Benchmark iterations:                100
 =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
 
-Implementation                  Func µs             ROI µs            Ovhd µs         Max|err|[0]        Mean|err|[0]       Total|err|[0]
-saxpy reference                    38.01               15.97               22.05            0.00e+00            0.00e+00            0.00e+00
-saxpy gpu                       73151.41                1.07            73150.34            3.30e+06            1.66e+06            1.70e+09  <-- FAIL
+Implementation              ROI µs/Iter            Func µs            Ovhd µs         Max|err|[0]        Mean|err|[0]       Total|err|[0]
+saxpy reference                     0.28               33.67                5.63            0.00e+00            0.00e+00            0.00e+00                                   
+saxpy gpu                          10.89           137828.11           136739.02            5.75e+06            2.85e+06            2.92e+09            <-- FAIL         
 ```
 In this case, `saxpy_gpu` failed.
 
@@ -232,6 +256,23 @@ Example:
 ```bash
 ./saxpy --iters 1000
 ```
+
+#### `--tolerance` Numerical Error tolerance
+Floating point operations are never 100% accurate. 
+Therefore tolerance is needed to be set.
+
+For any floating point T, the tolerance is defaulted to be:
+```cpp
+std::numeric_limits<T>::epsilon() * 1e3
+```
+For integral type, the tolerance is defaulted to be 0.
+
+To define the tolerance, the `--tolerance` flag can be used to set both floating point and integral tolerance:
+```bash
+./saxpy --tolerance 1e-3 #FP tol = 1e-3; Int tol = 0;
+./saxpy --tolerance 2    #FP tol = 2.0;  Int tol = 2;
+```
+
 
 ## 1.3. Basic Working Principle
 
@@ -439,20 +480,19 @@ void impl(const Inputs&... in,
           Outputs&...      out);
 ```
 
-Instantiate the comparison context by forwarding the input arguments into the nested `OutputContext` constructor:
+Instantiate the comparison context by defining output types and forwarding the input arguments:
 
 ```cpp
-comppare::InputContext<Inputs...>
-          ::OutputContext<Outputs...> 
-            cmp(in...);
+InputType1 input1{...}; // initialize input1
+InputType2 input2{...}; // initialize input2
+auto cmp = comppare::make_comppare<OutputType1, OutputType2, ...>(input1, input2, ...);
 ```
 
-* **`Inputs...`**
-  Variadic template parameters corresponding to the **types** of the input arguments of `impl` (e.g. `float`, `std::vector<int>`, etc.).
-* **`Outputs...`**
-  Variadic template parameters corresponding to the **types** of the output arguments of `impl`.
+* `OutputType1, OutputType2, ...`: **types** of output
+* `input1, input2, ...` : **variables/values** of input
 
-The order of `Inputs...` and `Outputs...` must match the order in the `impl` signature. After construction, `cmp` is ready to have implementations registered (via `set_reference` / `add`) and executed (via `run`).
+
+The order of `inputs...` and `OutputTypes...` must match the order in the `impl` signature. After construction, `cmp` is ready to have implementations registered (via `set_reference` / `add`) and executed (via `run`).
 
 
 
@@ -502,8 +542,8 @@ comppare::Impl& set_reference(
 ##### Example <!-- omit from toc -->
 
 ```cpp
-void ref_impl(const Inputs&..., Outputs...){};
-auto cmp = comppare::InputContext<Inputs...>::OutputContext<Outputs...>();
+void ref_impl(const InputTypes&..., OutputTypes&...){};
+auto cmp = comppare::make_comppare<OutputTypes...>(inputs...);
 
 cmp.set_reference(/*display name*/"reference implementation", /*function*/ ref_impl);
 ```
@@ -553,8 +593,8 @@ comppare::Impl& add(
 ##### Example <!-- omit from toc -->
 
 ```cpp
-void ref_impl(const Inputs&..., Outputs...){};
-auto cmp = comppare::InputContext<Inputs...>::OutputContext<Outputs...>();
+void ref_impl(const InputTypes&..., OutputTypes&...){};
+auto cmp = comppare::make_comppare<OutputTypes...>(inputs...);
 
 cmp.set_reference(/*display name*/"reference implementation", /*function*/ ref_impl);
 cmp.add(/*display name*/"Optimized memcpy", /*function*/ fast_memcpy_impl);
@@ -596,17 +636,15 @@ int main(int argc, char **argv)
 
 ### 2.2.4. Summary of `main()` <!-- omit from toc -->
 ```cpp
-void reference_impl(const Inputs&... in,
-                    Outputs&...      out);
+void reference_impl(const InputTypes&... in,
+                    OutputTypes&...      out);
 
-void optimized_impl(const Inputs&... in,
-                    Outputs&...      out);
+void optimized_impl(const InputTypes&... in,
+                    OutputTypes&...      out);
 
 int main(int argc, char** argv)
 {
-    comppare::InputContext<Inputs...>
-              ::OutputContext<Outputs...> 
-                cmp(in...);
+    auto cmp = comppare::make_comppare<OutputTypes...>(inputs...);
     
     cmp.set_reference("Reference", reference_impl);
 
